@@ -12,6 +12,76 @@ Pre-made question banks and learning apps offers convenient and structured pract
 
 ## 2. Objectives, Architecture, and Key Features
 
+### Main Objectives and Core Functionality
+
+The main objective is to give language learners control over what they practise by turning their own materials into customised exercises with immediate feedback and persistent progress tracking.
+
+The core functionalities include user registration and authentication, custom JSON paper uploads, immediate grading and feedback, and persistent storage of answers and progress for resuming practice across sessions and devices.
+
+### Assumptions
+The whole project is under the assumption that users access the service from any location with internet access through a web browser and they are geographically concentrated. The initial capacity limit is 100 registered users and 20 concurrently active learners. 
+
+### Planned system architecture and rationales
+
+As shown in Figure 1 below, users primarily interact with the Web Frontend, sending requests through the HTTPS Gateway to the Orchestrator for routing to application modules. The Authenticator verifies user identity; the Paper Manager calls the Paper Validator to check uploaded papers; and the Grader evaluates submitted answers while the Progress Tracker records the latest answers. These modules share a PostgreSQL database allowing users to resume their work across sessions and devices.
+
+![Grace system architecture: browser frontend, HTTPS gateway, application modules, PostgreSQL, and persistent storage](assets/grace-program-diagram.png)
+
+*Figure 1. Grace system architecture.*
+
+The yellow `Local` area represents browser-based interaction occurring on users' devices, while the blue `Kubernetes` area contains the server-side workloads for keeping authoritative state on the server. The gateway, application, and PostgreSQL run in separate `Pods` because their respective responsibilities. This separation allows application replicas to scale without coupling lifecycles to the database.
+
+Within the `Pod Scalable` boundary, the business logic is organised into separate functional modules. This reduces integration and deployment overhead at the cost of releasing and scaling all modules together.
+
+All application replicas share PostgreSQL-backed sessions and practice records, allowing requests to reach  replicas without relying on replica-local state. PostgreSQL therefore uses a Persistent Volume whose lifecycle is separate from the database Pod, allowing replacement Pods to reuse existing records. This supports recovery from Pod replacement.
+
+### Alternative Design and Tradeoffs
+
+The team initially considered using Fly.io's higher-level application deployment model, which is known for its integrated multi-region deployment and easy management. 
+
+However, such choice offers limited benefit under the assumption of a small, geographically concentrated user base. The selected Kubernetes design prioritises explicit control over deployment, storage, and scaling policies, while trading-off greater configuration and integration complexity for Fly.io's higher-level deployment model requires. A Kubernetes-based approach may also expose the system to the risk of exhausting shared database capacity if user demand grows unexpectedly..
+
+However, under the initial workload assumptions, these risks are considered manageable through staged deployment testing. The choice therefore accepts additional operational responsibility in exchange for deployment control.
+
+
+### Required course technologies
+
+- `Docker and Docker Compose`: Docker will package the application and PostgreSQL as separate containers. Docker Compose will provide a consistent local development and integration-testing environment.
+
+- `PostgreSQL and persistent storage`: PostgreSQL will persist accounts, sessions, papers, questions, answers, and positions. Local named volumes and Kubernetes PersistentVolumeClaims keep database files independent of container replacement.
+
+- `Deployment provider`: DigitalOcean provides cloud platform, integrating managed cluster infrastructure with provider networking, storage, and monitoring.
+
+- `Orchestration`: Kubernetes was selected over Docker Swarm because HPA, PVCs, and CronJobs provide a consistent way to configure autoscaling, persistent storage, and scheduled backups. This reduces custom operational scripting at the cost of more initial configuration. See Section 4.2, Exploration and Evaluation, for the detailed comparison.
+
+- `Monitoring and observability`: DigitalOcean resource metrics and alerts, kube-state-metrics, external HTTPS availability checks, and structured logs will expose resource pressure and application failures. Liveness and readiness endpoints distinguish a running process from an application able to reach its database.
+
+### Advanced features and integration
+
+- `Auto-scaling and high availability`: The team will use Kubernetes horizontal pod autoscaling and multiple application replicas to handle changing demand and keep the application available when an application Pod fails. This provides automatic scaling and application-level redundancy.
+
+- `Security enhancements`: The team will implement HTTPS, user-level access controls, and deployment secret management to protect data in transit, prevent unauthorised access, and keep credentials outside the code repository.
+
+- `CI/CD pipeline`: The team will automate tests, container builds, and deployment steps, with manual approval for production releases. This creates a repeatable integration and delivery process for team contributions.
+
+- `Backup and recovery`: The team will schedule PostgreSQL backups to separate storage and test database restoration. This provides a verified recovery path beyond the protection offered by persistent volumes.
+
+- `Integration with external services`: The team will integrate an external email provider's API so users can request their practice results by email. This connects the application's saved results to a third-party delivery service.
+
+### Scope and feasibility
+
+The scope of the project is a single-region, stateful language-practice service for an initially small, geographically concentrated user base. Delivery covers the complete workflow from account creation and custom paper upload to grading and saved-progress recovery, supported by a monitored Kubernetes deployment with persistent PostgreSQL storage. 
+
+The feasibility of the project is supported by the following:
+
+- The team has completed an MVP that provides a foundation for accounts, paper uploads, practice, database persistence, and deployment.
+
+- Three feature owners can develop accounts, papers, and practice in parallel, while the system architect establishes the shared framework, API contracts, and data structures to reduce blocking dependencies.
+
+- Scaling, monitoring, security, CI/CD, and backups extend the same application and deployment foundation, limiting additional implementation overhead while requiring separate validation of each capability.
+
+- Weekly Friday team meetings will support coordination, with core functionality targeted for November 6, integration and joint debugging for November 13, and design finalisation for November 20. Further details appear in Section 3, Project Plan and Team Responsibilities.
+
 ## 3. Project Plan and Team Responsibilities
 
 ## 4. Initial Team Reasoning and AI-Assisted Exploration
