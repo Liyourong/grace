@@ -4,11 +4,11 @@
 
 ### 1.1 Problem Statement and Significance
 
-Language learners frequently pursue specific objectives, such as preparing for certification exams or acquiring native expressions. Pre-built question banks typically follow a generic curriculum and do not address these individualized needs. Learners prefer to create practice materials from class notes, textbooks, or personal error logs, which allows for greater control over content. Even when exercises and reference answers are available, learners must still verify responses and track completed questions. When practice occurs in short sessions, returning to the material often requires reviewing previous work, identifying unanswered questions, and determining where to resume. Repeating this process leaves less time for practice. Therefore, Grace is designed to keep answers and progress with the exercises so learners can pick up where they left off.
+Language learners frequently pursue specific objectives using their own custom materials, such as preparing for certification exams or acquiring native expressions. Pre-built question banks typically follow a generic curriculum and do not address these individualized needs. Even when exercises are available, learners must still verify responses and track completed questions. When practice occurs in short sessions, returning to the material often requires reviewing previous work, identifying unanswered questions, and determining where to resume. Repeating this process leaves less time for practice. Therefore, Grace is designed to keep answers and progress with the exercises so learners can pick up where they left off.
 
 ### 1.2 Intended Users and Stakeholders
 
-The target users are language learners who possess customized exercises and reference answers, and seek to practice these materials over multiple short sessions. A student revisiting French-class mistakes may complete only part of a practice set during a short study break. At the next session, they need to distinguish unpracticed questions from completed ones and review their previous answers manually. Grace keeps their exercises, submitted answers, and progress together across sessions and devices.
+The target users are language learners who possess customized exercises and seek to practice these materials over multiple sessions. A student revisiting French-class mistakes may complete only part of a practice set during a short study break. At the next session, they need to distinguish unpracticed questions from completed ones and review their previous answers manually. Grace keeps their exercises, submitted answers, and progress together across sessions and devices.
 
 ### 1.3 Limitations of Existing Solutions
 
@@ -20,16 +20,16 @@ Existing platforms such as Duolingo offer structured lessons, but their practice
 
 The main objective is to build a cloud service that helps language learners practice with their own prepared exercises and reference answers, receive immediate feedback, and resume their progress across sessions and devices.
 
-The core functionalities include user registration and authentication, custom JSON paper uploads, immediate grading and feedback, and persistent storage of answers and progress for resuming practice across sessions and devices.
+The core functionalities include user registration and authentication, JSON paper uploads, grading, and persistent storage of answers and progress for resuming practice across sessions and devices.
 
 ### 2.2 Assumptions
-The whole project is under the assumption that users access the service from any location with internet access through a web browser and they are geographically concentrated. The proposed capacity upper limit is 100 registered users and 20 concurrently active learners. 
+The whole project is under the assumption that users access the service through a web browser and they are geographically concentrated. The proposed capacity upper limit is 100 registered users and 20 concurrently active learners. 
 
 ### 2.3 Planned system architecture and rationales
 
 As shown in Figure 1 below, users primarily interact with the Web Frontend, sending requests through the HTTPS Gateway to the Orchestrator for routing to application modules. The Authenticator verifies user identity by comparing the credentials provided by users against stored data. The Paper Manager calls the Paper Validator to check uploaded papers against the required JSON schema. The Grader checks submitted answers against the paper’s reference key, while the Progress Tracker saves practice progress. Each submission will be stored as an attempt, with a separate progress record identifying the learner’s current position. These modules share a PostgreSQL database allowing users to resume their work across sessions and devices.
 
-![Grace system architecture: browser frontend, HTTPS gateway, application modules, PostgreSQL, and persistent storage](https://raw.githubusercontent.com/Liyourong/grace/c3ea25174723bb7e6e418e17ab0e04f5d38cc680/assets/grace-program-diagram.png)
+![Grace system architecture: browser frontend, HTTPS gateway, application modules, PostgreSQL, and persistent storage](https://github.com/Liyourong/grace/blob/dev/assets/grace-program-diagram.png?raw=true)
 
 *Figure 1. Grace system architecture*
 
@@ -58,15 +58,15 @@ There is also a risk that scaling application replicas may increase pressure on 
 
 - `Orchestration`: Kubernetes was selected as the orchestration approach. We will use minikube for local development and DigitalOcean Kubernetes for production deployment.
 
-- `Monitoring and observability`: DigitalOcean resource metrics and alerts, kube-state-metrics, external HTTPS availability checks, and structured logs will expose resource pressure and application failures. Liveness and readiness endpoints distinguish a running process from an application able to reach its database.
+- `Monitoring and observability`: DigitalOcean resource metrics and alerts, kube-state-metrics, and structured logs will expose resource pressure and application failures. Liveness and readiness endpoints distinguish a running process from an application able to reach its database.
 
 - `Auto-scaling and high availability`: We will use Kubernetes pod autoscaling and multiple application replicas to handle changing demand. This provides automatic scaling and application-level redundancy.
 
 - `Security enhancements`: We will implement HTTPS, user-level access controls, and deployment secret management to protect data in transit, prevent unauthorized access, and keep credentials outside the code repository.
 
-- `CI/CD pipeline`: We will automate tests, container builds, and deployment steps, with manual approval for production releases. This creates a repeatable integration and delivery process for team contributions.
+- `CI/CD pipeline`: We will automate tests, container builds, and deployment steps using GitHub Actions. This creates a repeatable integration & deployment for team contributions.
 
-- `Backup and recovery`: We will schedule PostgreSQL backups to separate storage and test database restoration. This provides a verified recovery path beyond the protection offered by persistent volumes.
+- `Backup and recovery`: We will schedule PostgreSQL backups to separate storage. This provides a recovery path beyond the existing protection.
 
 
 ### 2.6 Scope and feasibility
@@ -90,12 +90,13 @@ The feasibility of the project is supported by the following:
 | Developer — Minwen Chen | <ul><li>Authenticator: accounts, authentication, and access control</li></ul> |
 | Developer — Xinyu Liu | <ul><li>Grader and Progress Tracker: practice interactions, answer evaluation, attempt history, and progress recovery</li></ul> |
 | Developer — Yiyun Mao | <ul><li>Paper Manager and Paper Validator: custom paper and question validation, upload, storage, and management</li></ul> |
-| System Architect — Liyourong Wang | <ul><li>Lead architecture and maintain the Orchestrator and shared application backbone</li><li>Coordinate schemas and API contracts</li><li>Own cloud and database DevOps, including Kubernetes deployment and PostgreSQL operations</li></ul> |
+| Architect — Liyourong Wang | <ul><li>Lead architecture and maintain the Orchestrator and shared application backbone</li><li>Coordinate schemas and API contracts</li><li>Own cloud and database DevOps, including Kubernetes deployment and PostgreSQL operations</li></ul> |
+
 Each developer will write module tests and resolve integration issues.
 
 ### 3.2 Major stages of development
 
-![Grace development Gantt chart showing milestones, task dependencies, and team responsibilities](https://raw.githubusercontent.com/Liyourong/grace/c3ea25174723bb7e6e418e17ab0e04f5d38cc680/assets/gantt-chart.png)
+![Grace development Gantt chart showing milestones, task dependencies, and team responsibilities](https://github.com/Liyourong/grace/blob/dev/assets/gantt-chart.png?raw=true)
 
 *Figure 2. Grace development schedule and task dependencies*
 
@@ -115,9 +116,9 @@ Starting from the MVP, iterations will combine parallel development, integration
 
 | Risk | Description | Mitigation |
 | --- | --- | --- |
-| **R1 — System Architect bottleneck** | Concentrated architecture responsibilities could delay dependent tasks. | Liyourong will provide shared capabilities before dependent development begins. Teammates will track blockers in Issues and coordinate integration fixes. |
-| **R2 — Module interface dependencies** | Paper management and practice rely on shared authentication and paper interfaces. | Use agreed interfaces and notify affected developers of changes through Issues. |
-| **R3 — Integration delays** | Late integration or cloud-setup failures could compress M4 acceptance and rehearsal time. | Start integration checks in M2 and prioritize acceptance-blocking fixes during M3 validation. |
+| **System Architect bottleneck** | Concentrated architecture responsibilities could delay dependent tasks. | Liyourong will provide shared capabilities before dependent development begins. Teammates will track blockers in Issues and coordinate integration fixes. |
+| **Module interface dependencies** | Paper management and practice rely on shared authentication. | Use agreed interfaces and notify affected developers of changes through Issues. |
+| **Integration delays** | Integration delays could compress M4 acceptance and rehearsal time. | Start integration checks in M2 and prioritize blocker fixes during M3 validation. |
 
 ## 4. Initial Team Reasoning and AI-Assisted Exploration
 
@@ -125,7 +126,7 @@ Starting from the MVP, iterations will combine parallel development, integration
 
 Our initial idea for Grace came from a practical limitation in existing language learning apps mentioned in previous sections. We want a cloud service where users practice their custom language exercises.
 
-Before using AI, we formed two technical hypotheses. First, to avoid spending time on a complex frontend editor, we defined a JSON schema so users could write exercises externally. Second, as our MVP already ran on Docker Compose with PostgreSQL, we assumed Docker Swarm would be the orchestration choice since it reuses Compose configuration.
+We formed two technical hypotheses initially. First, we defined a JSON schema so users could write exercises externally. Second, as our MVP already ran on Docker Compose, we assumed Docker Swarm would be the orchestration choice since it reuses Compose configuration.
 
 We also proposed an open question to investigate:
 - Which is more practical on DigitalOcean once we add persistent PostgreSQL storage, auto-scaling, and scheduled backups, Docker Swarm or Kubernetes?
