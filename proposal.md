@@ -8,7 +8,7 @@ Language learners frequently pursue specific objectives, such as preparing for c
 
 ### 1.2 Intended Users and Stakeholders
 
-The target users are language learners who possess customized exercises and reference answers, and seek to practice these materials over multiple short sessions. A student revisiting French-class mistakes may complete only part of a practice set during a short study break. At the next session, they need to distinguish unpracticed questions from completed ones and recover their previous works manually. Grace keeps their exercises, submitted answers, and progress together across sessions and devices.
+The target users are language learners who possess customized exercises and reference answers, and seek to practice these materials over multiple short sessions. A student revisiting French-class mistakes may complete only part of a practice set during a short study break. At the next session, they need to distinguish unpracticed questions from completed ones and review their previous answers manually. Grace keeps their exercises, submitted answers, and progress together across sessions and devices.
 
 ### 1.3 Limitations of Existing Solutions
 
@@ -18,7 +18,7 @@ Existing platforms such as Duolingo offer structured lessons, but their practice
 
 ### 2.1 Main Objectives and Core Functionality
 
-The main objective is to build a cloud service that helps language learners practise with their own prepared exercises and reference answers, receive immediate feedback, and resume their progress across sessions and devices.
+The main objective is to build a cloud service that helps language learners practice with their own prepared exercises and reference answers, receive immediate feedback, and resume their progress across sessions and devices.
 
 The core functionalities include user registration and authentication, custom JSON paper uploads, immediate grading and feedback, and persistent storage of answers and progress for resuming practice across sessions and devices.
 
@@ -27,23 +27,23 @@ The whole project is under the assumption that users access the service from any
 
 ### 2.3 Planned system architecture and rationales
 
-As shown in Figure 1 below, users primarily interact with the Web Frontend, sending requests through the HTTPS Gateway to the Orchestrator for routing to application modules. The Authenticator verifies user identity by comparing the credentials provided from users against stored data. The Paper Manager calls the Paper Validator to check uploaded papers if they fullfill the required JSON schema. The Grader evaluates submitted answers with the reference key provided in the paper, while the Progress Tracker records the latest answers and document the progress to the database for later recall. These modules share a PostgreSQL database allowing users to resume their work across sessions and devices.
+As shown in Figure 1 below, users primarily interact with the Web Frontend, sending requests through the HTTPS Gateway to the Orchestrator for routing to application modules. The Authenticator verifies user identity by comparing the credentials provided by users against stored data. The Paper Manager calls the Paper Validator to check uploaded papers against the required JSON schema. The Grader checks submitted answers against the paper’s reference key, while the Progress Tracker saves practice progress. Each submission will be stored as an attempt, with a separate progress record identifying the learner’s current position. These modules share a PostgreSQL database allowing users to resume their work across sessions and devices.
 
-![Grace system architecture: browser frontend, HTTPS gateway, application modules, PostgreSQL, and persistent storage](assets/grace-program-diagram.png)
+![Grace system architecture: browser frontend, HTTPS gateway, application modules, PostgreSQL, and persistent storage](https://raw.githubusercontent.com/Liyourong/grace/c3ea25174723bb7e6e418e17ab0e04f5d38cc680/assets/grace-program-diagram.png)
 
 *Figure 1. Grace system architecture*
 
-The yellow `Local` area represents browser-based interaction occurring on users' devices, while the blue `Kubernetes` area contains the server-side workloads for keeping authoritative state on the server. The gateway, application, and PostgreSQL run in separate `Pods` because their respective responsibilities. This separation allows application replicas to scale without coupling lifecycles to the database.
+The yellow `Local` area represents browser-based interaction occurring on users' devices, while the blue `Kubernetes` area contains the server-side workloads for keeping authoritative state on the server. The gateway, application, and PostgreSQL run in separate `Pods` to separate their lifecycles and scaling requirements. This separation allows application replicas to scale without coupling lifecycles to the database.
 
-Within the `Pod Scalable` boundary, the business logic is organised into separate functional modules. This reduces integration and deployment overhead at the cost of releasing and scaling all modules together.
+Within the `Pod Scalable` boundary, the business logic is organized into separate functional modules. This reduces integration and deployment overhead at the cost of releasing and scaling all modules together.
 
-All application replicas share PostgreSQL-backed sessions and practice records, allowing requests to reach  replicas without relying on replica-local state. PostgreSQL therefore uses a Persistent Volume whose lifecycle is separate from the database Pod, allowing replacement Pods to reuse existing records. This supports recovery from Pod replacement.
+All application replicas share PostgreSQL-backed sessions and practice records, allowing requests to reach any replica without relying on replica-local state. PostgreSQL therefore uses a Persistent Volume whose lifecycle is separate from the database Pod, allowing replacement Pods to reuse existing records. This supports recovery from Pod replacement.
 
 ### 2.4 Alternative Design, Tradeoffs and Risks
 
 Docker Swarm was considered as an alternative option, because Docker Swarm offers a simpler transition from our existing Compose-based environment without the complexity of managing a full Kubernetes cluster. 
 
-We finally selected Kubernetes because that we judge the benefits of HPA, PVCs, and CronJobs to be worth the additional setup and operational work compared with a simpler Swarm deployment. The tradeoff is greater configuration and troubleshooting effort for a relatively small service. Details regarding the comparison between Docker Swarm and Kubernetes are in Section 4.2.
+We selected Kubernetes because we judge the benefits of HPA, PVCs, and CronJobs to be worth the additional setup and operational work compared with a simpler Swarm deployment. The tradeoff is greater configuration and troubleshooting effort for a relatively small service. Details regarding the comparison between Docker Swarm and Kubernetes are in Section 4.2.
 
 There is also a risk that scaling application replicas may increase pressure on the shared PostgreSQL database. We will use load testing to set replica limits that the database can support to minimize the impact of this risk.
 
@@ -52,17 +52,17 @@ There is also a risk that scaling application replicas may increase pressure on 
 
 - `Docker and Docker Compose`: Docker will package the application and PostgreSQL as separate containers. Docker Compose will provide a consistent local development and integration-testing environment.
 
-- `PostgreSQL and persistent storage`: PostgreSQL will persist data entries needed. Local volumes and Kubernetes keep database files independent of container replacement.
+- `PostgreSQL and persistent storage`: PostgreSQL will store accounts, sessions, papers, questions, submitted answers, and practice progress. Docker named volumes will preserve local data, while a Kubernetes PersistentVolumeClaim backed by DigitalOcean block storage will preserve cloud database files across Pod replacement.
 
-- `Deployment provider`: DigitalOcean provides cloud platform, integrating managed cluster infrastructure with provider networking, storage, and monitoring.
+- `Deployment provider`: DigitalOcean provides a cloud platform, integrating managed cluster infrastructure with provider networking, storage, and monitoring.
 
-- `Orchestration`: Kubernetes was selected as orchectration approach. We will use minikube for local development and DigitalOcean Kubernetes for production deployment.
+- `Orchestration`: Kubernetes was selected as the orchestration approach. We will use minikube for local development and DigitalOcean Kubernetes for production deployment.
 
 - `Monitoring and observability`: DigitalOcean resource metrics and alerts, kube-state-metrics, external HTTPS availability checks, and structured logs will expose resource pressure and application failures. Liveness and readiness endpoints distinguish a running process from an application able to reach its database.
 
 - `Auto-scaling and high availability`: We will use Kubernetes pod autoscaling and multiple application replicas to handle changing demand. This provides automatic scaling and application-level redundancy.
 
-- `Security enhancements`: We will implement HTTPS, user-level access controls, and deployment secret management to protect data in transit, prevent unauthorised access, and keep credentials outside the code repository.
+- `Security enhancements`: We will implement HTTPS, user-level access controls, and deployment secret management to protect data in transit, prevent unauthorized access, and keep credentials outside the code repository.
 
 - `CI/CD pipeline`: We will automate tests, container builds, and deployment steps, with manual approval for production releases. This creates a repeatable integration and delivery process for team contributions.
 
@@ -75,7 +75,7 @@ The scope of the project is a single-region, stateful language-practice service 
 
 The feasibility of the project is supported by the following:
 
-- We has completed a DigitalOcean deployed MVP that provides a foundation for all future development.
+- We have deployed an MVP on DigitalOcean that provides a foundation for all future development.
 
 - Three feature owners can develop accounts, papers, and practice in parallel, while the system architect establishes the shared framework, API contracts, and data structures to reduce blocking dependencies.
 
@@ -87,36 +87,37 @@ The feasibility of the project is supported by the following:
 
 | Team Member | Responsibilities |
 | --- | --- |
-| Developer — Minwen Chen | <ul><li>Authenticator: accounts, authentication, and access control</li><li>Resolve integration issues</li></ul> |
+| Developer — Minwen Chen | <ul><li>Authenticator: accounts, authentication, and access control</li></ul> |
 | Developer — Xinyu Liu | <ul><li>Grader and Progress Tracker: practice interactions, answer evaluation, attempt history, and progress recovery</li></ul> |
 | Developer — Yiyun Mao | <ul><li>Paper Manager and Paper Validator: custom paper and question validation, upload, storage, and management</li></ul> |
 | System Architect — Liyourong Wang | <ul><li>Lead architecture and maintain the Orchestrator and shared application backbone</li><li>Coordinate schemas and API contracts</li><li>Own cloud and database DevOps, including Kubernetes deployment and PostgreSQL operations</li></ul> |
+Each developer will write module tests and resolve integration issues.
 
 ### 3.2 Major stages of development
 
-![Grace development Gantt chart showing milestones, task dependencies, and team responsibilities](assets/gantt-chart.png)
+![Grace development Gantt chart showing milestones, task dependencies, and team responsibilities](https://raw.githubusercontent.com/Liyourong/grace/c3ea25174723bb7e6e418e17ab0e04f5d38cc680/assets/gantt-chart.png)
 
 *Figure 2. Grace development schedule and task dependencies*
 
-As shown in Figure 2, we will complete 4 milestones:
+Starting from the MVP, iterations will combine parallel development, integration demonstrations, and backlog reviews.
 
-- **M1 — Foundation:** Define features and interfaces, and complete the initial full-stack development. This milestone is completed in advance of the target date.
-- **M2 — Initial module development:** Develop the draft-version submodules in parallel. This milestone is currently in progress.
-- **M3 — Module finalisation and testing:** Finalise functional modules, then conduct joint testing, frontend integration, and system testing.
+- **M1 — Foundation:** Define features and interfaces, and complete the initial full-stack development.
+- **M2 — Initial module development:** Develop modules in parallel and begin interface checks.
+- **M3 — Module finalization and testing:** Finalize functional modules, then conduct joint testing, frontend integration, and system testing.
 - **M4 — Acceptance and presentation preparation:** Complete acceptance testing, followed by slide preparation and presentation rehearsal.
 
 ### 3.3 Team Development and Integration Strategy
 1. **Dependencies and interface agreements.** We will identify module dependencies while agreeing on request formats before parallel development.
 
-2. **Branch development and CI/CD.** Developers will create task branches from `dev` and submit PRs for review. A CI/CD pipeline to automate builds, tests, and deployments. PRs will be merged into `dev` after review and successful checks.
+2. **Branch development and CI/CD.** Developers will create task branches from `dev` and submit PRs for review. A CI/CD pipeline will automate builds, tests, and deployments. PRs will be merged into `dev` after review and successful checks. End-to-end tests will cover registration, private paper upload, answer feedback, progress recovery, and cross-user data isolation in Docker Compose and on DigitalOcean Kubernetes.
 
-3. **Progress sharing and task management.** Team members will share progress and blockers through GitHub Discussions. GitHub Issues will be used to create and assign tasks and track their status.
+3. **Progress sharing and task management.** Team members will share progress and blockers through GitHub Discussions. GitHub Issues will track tasks and blockers.
 
 | Risk | Description | Mitigation |
 | --- | --- | --- |
-| **R1 — System Architect bottleneck** | Concentrated architecture responsibilities could delay dependent tasks. | Flag blockers early through Issues and arrange help promptly. |
+| **R1 — System Architect bottleneck** | Concentrated architecture responsibilities could delay dependent tasks. | Liyourong will provide shared capabilities before dependent development begins. Teammates will track blockers in Issues and coordinate integration fixes. |
 | **R2 — Module interface dependencies** | Paper management and practice rely on shared authentication and paper interfaces. | Use agreed interfaces and notify affected developers of changes through Issues. |
-| **R3 — Integration delays** | Late integration failures could compress M4 acceptance and rehearsal time. | Start integration checks in M2 and prioritise acceptance-blocking fixes during M3 validation. |
+| **R3 — Integration delays** | Late integration or cloud-setup failures could compress M4 acceptance and rehearsal time. | Start integration checks in M2 and prioritize acceptance-blocking fixes during M3 validation. |
 
 ## 4. Initial Team Reasoning and AI-Assisted Exploration
 
@@ -126,12 +127,12 @@ Our initial idea for Grace came from a practical limitation in existing language
 
 Before using AI, we formed two technical hypotheses. First, to avoid spending time on a complex frontend editor, we defined a JSON schema so users could write exercises externally. Second, as our MVP already ran on Docker Compose with PostgreSQL, we assumed Docker Swarm would be the orchestration choice since it reuses Compose configuration.
 
-We also proposed a open questions to investigate:
-- Whether is more practical on DigitalOcean once we add persistent PostgreSQL storage, auto-scaling, and scheduled backups, Docker Swarm or Kubernetes?
+We also proposed an open question to investigate:
+- Which is more practical on DigitalOcean once we add persistent PostgreSQL storage, auto-scaling, and scheduled backups, Docker Swarm or Kubernetes?
 
 ### 4.2 Exploration and Evaluation
 
-We checked these assumptions through team discussion, local MVP testing, and AI-assisted demos. Testings to our local Docker Compose + PostgreSQL setup confirmed that a mounted volume keeps user records across container restarts.
+We checked these assumptions through team discussion, local MVP testing, and AI-assisted demos. Tests of our local Docker Compose + PostgreSQL setup confirmed that a mounted volume keeps user records across container restarts.
 
 For cloud-orchestration-platform decisions, we asked AI to build demos for both Docker Swarm and Kubernetes and compared how they perform:
 
@@ -149,7 +150,7 @@ flowchart LR
 | **Auto-Scaling** | No built-in auto-scaler; needs custom scripts calling `docker service scale` | Built-in CPU/memory scaling via `HorizontalPodAutoscaler` |
 | **Backups** | Host crontab tied to one machine | Cluster `CronJob` and `Secret` running `pg_dump` |
 
-Although AI highlighted Swarm's quick setup, comparing both demos showed that Swarm creates maintenance issues for volume failover and scaling later on. We dropped the Swarm idea and chose Kubernetes (`minikube` locally, then DigitalOcean Kubernetes) because the extra YAML setup upfront saves us from writing custom workarounds for our six planned advanced features.
+Although AI highlighted Swarm's quick setup, comparing both demos showed that Swarm creates maintenance issues for volume failover and scaling later on. We dropped the Swarm idea and chose Kubernetes (`minikube` locally, then DigitalOcean Kubernetes) because the extra YAML setup upfront saves us from writing custom workarounds for our four planned advanced features.
 
 
 ## 5. Conclusion
