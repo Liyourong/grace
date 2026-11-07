@@ -33,19 +33,19 @@ As shown in Figure 1 below, users primarily interact with the Web Frontend, send
 
 *Figure 1. Grace system architecture*
 
-The yellow `Local` area represents browser-based interaction occurring on users' devices, while the blue `Kubernetes` area contains the server-side workloads for keeping authoritative state on the server. The gateway, application, and PostgreSQL run in separate `Pods` to separate their lifecycles and scaling requirements. This separation allows application replicas to scale without coupling lifecycles to the database.
+The yellow `Local` area represents browser-based interaction on users' devices, while the blue `Kubernetes` area contains the server-side workloads for keeping authoritative state on the server. The gateway, application, and PostgreSQL run in separate `Pods` to separate their lifecycles and scaling requirements. This separation allows application replicas to scale without coupling lifecycles to the database.
 
 Within the `Pod Scalable` boundary, the business logic is organized into separate functional modules. This reduces integration and deployment overhead at the cost of releasing and scaling all modules together.
 
-All application replicas share PostgreSQL-backed sessions and practice records, allowing requests to reach any replica without relying on replica-local state. PostgreSQL therefore uses a Persistent Volume whose lifecycle is separate from the database Pod, allowing replacement Pods to reuse existing records. This supports recovery from Pod replacement.
+All application replicas share PostgreSQL-backed sessions and practice records, allowing requests to reach any replica without relying on replica-local state. PostgreSQL therefore uses a Persistent Volume whose lifecycle is separate from the database Pod, allowing replacement Pods to reuse existing records.
 
 ### 2.4 Alternative Design, Tradeoffs and Risks
 
-Docker Swarm was considered as an alternative option, because Docker Swarm offers a simpler transition from our existing Compose-based environment without the complexity of managing a full Kubernetes cluster. 
+Docker Swarm was considered because it reuses our Compose-based environment without a full Kubernetes cluster. 
 
-We selected Kubernetes because we judge the benefits of HPA, PVCs, and CronJobs to be worth the additional setup and operational work compared with a simpler Swarm deployment. The tradeoff is greater configuration and troubleshooting effort for a relatively small service. Details regarding the comparison between Docker Swarm and Kubernetes are in Section 4.2.
+We selected Kubernetes because we judge the benefits of HPA and PVCs, plus CronJobs for stretch backups, to be worth the additional setup and operational work compared with a simpler Swarm deployment. The tradeoff is greater configuration and troubleshooting effort for a relatively small service. Section 4.2 compares Swarm and Kubernetes.
 
-There is also a risk that scaling application replicas may increase pressure on the shared PostgreSQL database. We will use load testing to set replica limits that the database can support to minimize the impact of this risk.
+There is also a risk that scaling application replicas may increase pressure on the shared PostgreSQL database. We will use load testing to set replica limits the database can support.
 
 
 ### 2.5 Required course technologies
@@ -58,20 +58,20 @@ There is also a risk that scaling application replicas may increase pressure on 
 
 - `Orchestration`: Kubernetes was selected as the orchestration approach. We will use minikube for local development and DigitalOcean Kubernetes for production deployment.
 
-- `Monitoring and observability`: DigitalOcean resource metrics and alerts, kube-state-metrics, and structured logs will expose resource pressure and application failures. Liveness and readiness endpoints distinguish a running process from an application able to reach its database.
+- `Monitoring and observability`: DigitalOcean alerts will notify the team when node CPU or disk usage exceeds 80%, and a kube-state-metrics dashboard will show pod restarts and failed readiness checks. Structured logs and liveness/readiness endpoints distinguish a running process from an application able to reach its database.
 
-- `Auto-scaling and high availability`: We will use Kubernetes pod autoscaling and multiple application replicas to handle changing demand. This provides automatic scaling and application-level redundancy.
+- `Auto-scaling and high availability (advanced feature 1)`: A HorizontalPodAutoscaler will scale the stateless application Deployment from 2 replicas to a load-tested maximum, at 70% average CPU. Load tests above 20 users will confirm scale-out and find the database's replica limit. PostgreSQL runs as a single replica on its PVC, so high availability covers only the application tier.
 
-- `Security enhancements`: We will implement HTTPS, user-level access controls, and deployment secret management to protect data in transit, prevent unauthorized access, and keep credentials outside the code repository.
+- `CI/CD pipeline (advanced feature 2)`: GitHub Actions will run module tests and build images on each pull request. After end-to-end checks pass, a merge to `dev` will deploy to DigitalOcean Kubernetes.
 
-- `CI/CD pipeline`: We will automate tests, container builds, and deployment steps using GitHub Actions. This creates a repeatable integration & deployment for team contributions.
+- `Security baseline`: HTTPS, user-level access control, and Kubernetes Secrets protect private papers and answers. They are not advanced features.
 
-- `Backup and recovery`: We will schedule PostgreSQL backups to separate storage. This provides a recovery path beyond the existing protection.
+- `Backup and recovery (stretch goal)`: A CronJob will run `pg_dump` to DigitalOcean Spaces.
 
 
 ### 2.6 Scope and feasibility
 
-The scope of the project is a single-region, stateful language-practice service for an initially small, geographically concentrated user base. Delivery covers the complete workflow from account creation and custom paper upload to grading and saved-progress recovery. 
+The scope of the project is a single-region, stateful language-practice service for an initially small, geographically concentrated user base. Delivery covers the complete workflow from account creation and custom paper upload to grading and saved-progress recovery. We commit to two advanced features, auto-scaling/high availability and CI/CD, and will add backup if time allows.
 
 The feasibility of the project is supported by the following:
 
@@ -151,9 +151,9 @@ flowchart LR
 | **Auto-Scaling** | No built-in auto-scaler; needs custom scripts calling `docker service scale` | Built-in CPU/memory scaling via `HorizontalPodAutoscaler` |
 | **Backups** | Host crontab tied to one machine | Cluster `CronJob` and `Secret` running `pg_dump` |
 
-Although AI highlighted Swarm's quick setup, comparing both demos showed that Swarm creates maintenance issues for volume failover and scaling later on. We dropped the Swarm idea and chose Kubernetes (`minikube` locally, then DigitalOcean Kubernetes) because the extra YAML setup upfront saves us from writing custom workarounds for our four planned advanced features.
+Although AI highlighted Swarm's quick setup, comparing both demos showed that Swarm creates maintenance issues for volume failover and scaling. We dropped the Swarm idea and chose Kubernetes (`minikube` locally, then DigitalOcean Kubernetes) because the extra YAML setup upfront saves us from writing custom workarounds for autoscaling, volume failover, and scheduled backups.
 
 
 ## 5. Conclusion
 
-With an existing MVP, clear team responsibilities, and a staged development plan, we are confident that we can deliver Grace within the proposed timeline.
+With an existing MVP, clear team responsibilities, and a staged development plan, we can deliver Grace within the proposed timeline.
