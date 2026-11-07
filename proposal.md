@@ -64,9 +64,6 @@ There is also a risk that scaling application replicas may increase pressure on 
 
 - `CI/CD pipeline (advanced feature 2)`: GitHub Actions will run module tests and build images on each pull request. After end-to-end checks pass, a merge to `dev` will deploy to DigitalOcean Kubernetes.
 
-- `Security baseline`: HTTPS, user-level access control, and Kubernetes Secrets protect private papers and answers. They are not advanced features.
-
-- `Backup and recovery (stretch goal)`: A CronJob will run `pg_dump` to DigitalOcean Spaces.
 
 
 ### 2.6 Scope and feasibility
