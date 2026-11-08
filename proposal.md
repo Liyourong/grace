@@ -134,12 +134,9 @@ We checked these assumptions through team discussion, local MVP testing, and AI-
 
 For cloud-orchestration-platform decisions, we asked AI to build demos for both Docker Swarm and Kubernetes and compared how they perform:
 
-```mermaid
-flowchart LR
-  H["Initial Idea: Docker Swarm"] --> D["AI Demos: Swarm vs. K8s"]
-  D --> E["Check: PVC, HPA & CronJob"]
-  E --> K["Decision: Kubernetes (DOKS)"]
-```
+![Orchestration decision flow: Initial Idea (Docker Swarm) to AI Demos (Swarm vs. K8s) to Check (PVC, HPA & CronJob) to Decision (Kubernetes DOKS)](https://github.com/Liyourong/grace/blob/dev/assets/orchestration-decision-flow.png?raw=true)
+
+*Figure 3. Orchestration platform evaluation and decision flow*
 
 | Dimension | AI Demo A: Docker Swarm | AI Demo B: Kubernetes (`minikube` / DOKS) |
 | :--- | :--- | :--- |
