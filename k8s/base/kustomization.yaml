@@ -1,0 +1,13 @@
+namespace: grace
+# namespace.yaml is applied once by hand, never via -k: `kubectl delete -k` would delete the
+# namespace and with it the database PVC.
+resources:
+  - postgres.yaml
+  - app.yaml
+  - hpa.yaml
+# Generated ConfigMaps get a content hash in their name, so any change rolls the pods that use them.
+configMapGenerator:
+  - name: grace-config
+    literals:
+      - APP_ORIGINS=http://localhost:8090
+      - COOKIE_SECURE=false

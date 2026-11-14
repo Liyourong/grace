@@ -1,0 +1,58 @@
+# HTTPS entry point: DO LoadBalancer passes TCP 80/443 straight to Caddy, which gets and renews
+# a Let's Encrypt certificate for SITE_HOST (a sslip.io name of the LB IP) and proxies to the app.
+apiVersion: v1
+kind: Service
+metadata:
+  name: caddy
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-name: grace
+spec:
+  type: LoadBalancer
+  selector: { app: caddy }
+  ports:
+    - { name: http, port: 80, targetPort: 80 }
+    - { name: https, port: 443, targetPort: 443 }
+---
+# Certificates survive Caddy restarts, so redeploys do not re-request them from Let's Encrypt.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: caddy-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: { storage: 1Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: caddy
+spec:
+  replicas: 1
+  strategy: { type: Recreate } # the RWO volume can only be mounted by one pod at a time
+  selector:
+    matchLabels: { app: caddy }
+  template:
+    metadata:
+      labels: { app: caddy }
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:2
+          env:
+            - name: SITE_HOST
+              valueFrom: { configMapKeyRef: { name: grace-config, key: SITE_HOST } }
+          ports:
+            - containerPort: 80
+            - containerPort: 443
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: caddyfile, mountPath: /etc/caddy }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: caddy-data }
+        - name: caddyfile
+          configMap: { name: caddyfile }

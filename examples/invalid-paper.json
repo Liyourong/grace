@@ -1,0 +1,43 @@
+{
+  "format_version": 1,
+  "title": "格式错误示例",
+  "description": "一份包含三种题型的示例试卷。",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "prompt": "请选择表示“你好”的法语词。",
+      "options": [
+        {
+          "id": "a",
+          "text": "Bonjour"
+        },
+        {
+          "id": "b",
+          "text": "Merci"
+        }
+      ],
+      "correct_option_id": "z",
+      "correct_answer": "Bonjour",
+      "explanation": "Bonjour 可用于问候。"
+    },
+    {
+      "id": "q1",
+      "type": "translation",
+      "prompt": "将“谢谢”翻译为法语。",
+      "accepted_answers": [
+        "Merci",
+        "Merci !"
+      ],
+      "correct_answer": "Merci.",
+      "explanation": "本题接受文件中列出的表达及规则允许的形式差异。"
+    },
+    {
+      "id": "q3",
+      "type": "sentence",
+      "prompt": "用 aimer 表达“我喜欢法语”。",
+      "correct_answer": "J'aime le français.",
+      "explanation": "本题按预设答案匹配，不进行开放式语义评价。"
+    }
+  ]
+}

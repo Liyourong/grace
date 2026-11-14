@@ -1,0 +1,6 @@
+{$SITE_HOST} {
+  reverse_proxy app:80 {
+    # retry on a pod that just went away during a rolling update instead of returning 502
+    lb_try_duration 5s
+  }
+}

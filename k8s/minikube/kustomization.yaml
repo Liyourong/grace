@@ -1,0 +1,7 @@
+# Local cluster: image loaded with `minikube image load grace:local`, reached via port-forward on :8090.
+resources:
+  - ../base
+images:
+  - name: grace
+    newName: grace
+    newTag: local

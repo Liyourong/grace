@@ -1,0 +1,27 @@
+# DigitalOcean Kubernetes. SITE_HOST / APP_ORIGINS are the sslip.io name of the caddy LoadBalancer IP;
+# after changing them, `kubectl apply -k` rolls app and caddy automatically (hashed ConfigMap names).
+namespace: grace
+resources:
+  - ../base
+  - caddy.yaml
+images:
+  - name: grace
+    newName: registry.digitalocean.com/grace-dev/grace
+    newTag: v3
+configMapGenerator:
+  - name: grace-config
+    behavior: merge
+    literals:
+      - SITE_HOST=146-190-191-107.sslip.io
+      - APP_ORIGINS=https://146-190-191-107.sslip.io
+      - COOKIE_SECURE=true
+  - name: caddyfile
+    files:
+      - Caddyfile
+patches:
+  # Retain: deleting the PVC by mistake keeps the DO volume (and the data) instead of destroying it.
+  - target: { kind: StatefulSet, name: db }
+    patch: |-
+      - op: add
+        path: /spec/volumeClaimTemplates/0/spec/storageClassName
+        value: do-block-storage-retain

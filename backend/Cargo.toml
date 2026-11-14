@@ -1,0 +1,16 @@
+[package]
+name = "grace"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8"
+deadpool-postgres = { version = "0.14", features = ["rt_tokio_1"] }
+hex = "0.4"
+rand_core = { version = "0.6", features = ["getrandom"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio-postgres = { version = "0.7", features = ["with-serde_json-1"] }
+tower-http = { version = "0.6", features = ["fs"] }

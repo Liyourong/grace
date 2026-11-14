@@ -1,0 +1,31 @@
+# Local MVP. The password below is a local-only default; override POSTGRES_PASSWORD for anything shared.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: grace
+      POSTGRES_USER: grace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-grace_local_only}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grace -d grace"]
+      interval: 2s
+      retries: 30
+    restart: unless-stopped
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgres://grace:${POSTGRES_PASSWORD:-grace_local_only}@db:5432/grace
+      APP_ORIGINS: ${APP_ORIGINS:-http://localhost:8090,http://127.0.0.1:8090}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    ports:
+      - "8090:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

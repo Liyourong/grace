@@ -1,0 +1,56 @@
+# Single PostgreSQL instance. Its data lives on the PVC from volumeClaimTemplates, so it
+# survives pod deletion and redeploys. A PV is not a backup and not HA (spec 17.4).
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+spec:
+  selector: { app: db }
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17
+          env:
+            - { name: POSTGRES_DB, value: grace }
+            - { name: POSTGRES_USER, value: grace }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: grace-db, key: password } }
+            # Subdirectory: cloud block volumes have lost+found at their root, which initdb rejects.
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+          # Kubernetes sends SIGTERM (smart shutdown waits for the app's pooled connections and gets
+          # SIGKILLed after 30s). Fast shutdown closes them and stops cleanly.
+          lifecycle:
+            preStop:
+              exec: { command: ["gosu", "postgres", "pg_ctl", "stop", "-m", "fast"] }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "grace", "-d", "grace"] }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 512Mi }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: { storage: 5Gi }

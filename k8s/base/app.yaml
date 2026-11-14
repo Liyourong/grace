@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: grace }
+  template:
+    metadata:
+      labels: { app: grace }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # "nobody" from the image, numeric so the kubelet can verify non-root
+      containers:
+        - name: grace
+          image: grace # replaced per environment by kustomize `images:`
+          envFrom:
+            - configMapRef: { name: grace-config }
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: grace-db, key: password } }
+            # The secret is hex, so it is safe inside a URL without escaping.
+            - { name: DATABASE_URL, value: "postgres://grace:$(POSTGRES_PASSWORD)@db:5432/grace" }
+          ports:
+            - containerPort: 8080
+          # Keep serving while the pod is removed from Service endpoints, so rolling updates do not 502.
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "5"] }
+          # Startup waits for the database and runs migrations; liveness only starts once this passes.
+          startupProbe:
+            httpGet: { path: /health/live, port: 8080 }
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /health/live, port: 8080 }
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /health/ready, port: 8080 }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 100m, memory: 64Mi }
+            limits: { memory: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+spec:
+  selector: { app: grace }
+  ports:
+    - port: 80
+      targetPort: 8080

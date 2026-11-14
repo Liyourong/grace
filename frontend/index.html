@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grace</title>
+  <script>
+    // Runs before CSS paints so a saved theme never flashes the wrong colors.
+    (function () {
+      var mq = matchMedia('(prefers-color-scheme: dark)');
+      window.getTheme = function () { try { return localStorage.getItem('theme') || 'system'; } catch (e) { return 'system'; } };
+      window.setTheme = function (t) { try { localStorage.setItem('theme', t); } catch (e) {} applyTheme(); };
+      function applyTheme() {
+        var t = getTheme();
+        document.documentElement.dataset.theme = t === 'system' ? (mq.matches ? 'dark' : 'light') : t;
+      }
+      mq.addEventListener('change', applyTheme);
+      applyTheme();
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="app"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
