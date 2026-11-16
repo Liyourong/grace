@@ -259,10 +259,11 @@ fn parse_accepted_answers(
                 for (j, raw_ans) in arr.iter().enumerate() {
                     let label = format!("{prefix}：accepted_answers 第 {} 项", j + 1);
                     if let Some(ans) = check_nonblank_text(raw_ans, &label, MAX_TEXT_CHARS, errors) {
-                        // TODO(#17/#18): Once `crate::practice::normalize` is available on `dev`,
-                        // reject entries where `crate::practice::normalize(&ans).is_empty()`
-                        // (e.g., `"?!"` which consists only of punctuation).
-                        accepted.push(ans);
+                        if crate::practice::normalize(&ans).is_empty() {
+                            errors.push(format!("{label} 规范化后不能为空"));
+                        } else {
+                            accepted.push(ans);
+                        }
                     }
                 }
             }
@@ -757,5 +758,36 @@ mod tests {
         assert!(errs.iter().any(|e| e.contains("第 5 题：accepted_answers 必须是数组")));
         assert!(errs.iter().any(|e| e.contains("第 6 题：id 必须是字符串")));
         assert!(errs.iter().any(|e| e.contains("第 6 题：缺少 accepted_answers")));
+    }
+
+    #[test]
+    fn rejects_accepted_answers_empty_after_normalization() {
+        let errs = parse(&json!({
+            "format_version": 1,
+            "title": "Normalization check",
+            "questions": [
+                {
+                    "id": "q1",
+                    "type": "translation",
+                    "prompt": "p",
+                    "accepted_answers": ["?!", "Merci !", "... —"],
+                    "correct_answer": "Merci",
+                    "explanation": "e"
+                },
+                {
+                    "id": "q2",
+                    "type": "sentence",
+                    "prompt": "p",
+                    "accepted_answers": ["' - '"],
+                    "correct_answer": "a",
+                    "explanation": "e"
+                }
+            ]
+        }))
+        .unwrap_err();
+        assert_eq!(errs.len(), 3, "expected 3 errors, got: {errs:?}");
+        assert!(errs[0].contains("第 1 题：accepted_answers 第 1 项"));
+        assert!(errs[1].contains("第 1 题：accepted_answers 第 3 项"));
+        assert!(errs[2].contains("第 2 题：accepted_answers 第 1 项"));
     }
 }

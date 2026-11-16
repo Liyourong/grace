@@ -105,6 +105,14 @@ def main() -> None:
     assert status == 400, f"expected 400 for NUL input, got {status}: {err}"
     assert err["error"]["code"] == "invalid_paper_file", err
 
+    # 2b. Accepted answers that normalize to empty (e.g. "?!") return 400.
+    punct_paper = json.loads(json.dumps(valid_paper, ensure_ascii=False))
+    punct_paper["questions"][1]["accepted_answers"] = ["?!"]
+    status, err = user_a.request("POST", "/api/papers", punct_paper)
+    assert status == 400, f"expected 400 for punctuation-only accepted_answers, got {status}: {err}"
+    assert err["error"]["code"] == "invalid_paper_file", err
+    assert any("accepted_answers" in d for d in err["error"].get("details", [])), err
+
     # 3. Uploading the same file twice produces distinct paper IDs.
     status1, res1 = user_a.request("POST", "/api/papers", valid_paper)
     status2, res2 = user_a.request("POST", "/api/papers", valid_paper)
