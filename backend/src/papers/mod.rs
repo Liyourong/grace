@@ -1,6 +1,6 @@
-//! Uploading papers, listing them, and showing one paper. Right now any JSON file is accepted.
+//! Uploading papers, listing them, and showing one paper.
 //!
-//! Offers other modules: [`get`], [`find_question`], [`QuestionRow`].
+//! Offers other modules: [`get`], [`find_question`], [`QuestionRow`], [`valid_id`].
 //! Owns tables: `papers`, `questions`.
 //! Uses: `practice::answers`, `practice::progress`, `practice::Stats` for each paper's results.
 
@@ -15,6 +15,9 @@ use axum::{
 };
 use serde_json::{Value, json};
 
+// Exported for `practice` (#18) to validate question IDs in route parameters and position updates.
+#[allow(unused_imports)]
+pub use rules::valid_id;
 pub use store::{QuestionRow, find_question, get};
 
 use crate::{
@@ -30,7 +33,8 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn upload(State(s): State<AppState>, user: CurrentUser, Body(file): Body<Value>) -> Result<(StatusCode, Json<Value>)> {
-    let paper = rules::parse(&file);
+    let paper = rules::parse(&file)
+        .map_err(|details| AppError::bad_request("invalid_paper_file", "试卷文件格式不正确").with_details(details))?;
     let id = store::insert(&mut s.pool.get().await?, user.id, &paper).await?;
     eprintln!("paper {id} uploaded by user {} ({} questions)", user.id, paper.questions.len());
     Ok((
