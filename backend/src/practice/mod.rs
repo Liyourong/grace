@@ -17,7 +17,7 @@ use deadpool_postgres::Object;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-pub use rules::Stats;
+pub use rules::{Stats, normalize};
 pub use store::{answers, progress};
 
 use crate::{
