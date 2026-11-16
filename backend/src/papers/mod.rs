@@ -2,7 +2,7 @@
 //!
 //! Offers other modules: [`get`], [`find_question`], [`QuestionRow`], [`valid_id`].
 //! Owns tables: `papers`, `questions`.
-//! Uses: `practice::answers`, `practice::progress`, `practice::Stats` for each paper's results.
+//! Uses: `practice::answers`, `practice::progress`, `practice::Stats`, `practice::normalize`.
 
 mod rules;
 mod store;
