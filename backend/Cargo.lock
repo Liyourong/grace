@@ -364,6 +364,7 @@ dependencies = [
  "tokio",
  "tokio-postgres",
  "tower-http",
+ "unicode-normalization",
 ]
 
 [[package]]

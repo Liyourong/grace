@@ -2,6 +2,27 @@
 //! Add answer matching here.
 
 use serde::{Deserialize, Serialize};
+use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
+
+/// Compare written answers without accents, punctuation, case, or extra whitespace.
+/// NFD (not NFKD) preserves compatibility distinctions such as ligatures.
+pub fn normalize(input: &str) -> String {
+    let mut result = String::new();
+    let mut pending_space = false;
+    for ch in input.nfd().filter(|ch| !is_combining_mark(*ch)).flat_map(char::to_lowercase) {
+        if ch.is_alphanumeric() {
+            if pending_space && !result.is_empty() {
+                result.push(' ');
+            }
+            result.push(ch);
+            pending_space = false;
+        } else if ch.is_whitespace() {
+            pending_space = true;
+        }
+        // All other characters, including punctuation, are deleted.
+    }
+    result
+}
 
 /// What the user sent: `option_id` for choice questions, `text` for the others.
 #[derive(Deserialize)]
@@ -41,6 +62,28 @@ pub fn grade(s: Submission) -> (String, bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normalization_contract() {
+        assert_eq!(normalize("  J'aime   le FRANÇAIS. "), "jaime le francais");
+        assert_eq!(normalize("Ça va?"), "ca va");
+        assert_eq!(normalize("Ñandú"), "nandu");
+        assert_eq!(normalize("Merci !"), normalize("merci"));
+        assert_eq!(normalize("?! ..."), "");
+        assert_ne!(normalize("le chat"), normalize("chat le"));
+        assert_eq!(normalize("peut-être"), "peutetre");
+        assert_eq!(normalize("peut être"), "peut etre");
+        assert_ne!(normalize("ﬁn"), normalize("fin"));
+        assert_ne!(normalize("ＭＥＲＣＩ"), normalize("merci"));
+    }
+
+    #[test]
+    fn whitespace_is_collapsed_without_inserting_spaces_for_punctuation() {
+        assert_eq!(normalize("a\t\n  b"), "a b");
+        assert_eq!(normalize("a-b"), "ab");
+        assert_eq!(normalize("!a!!b!!"), "ab");
+        assert_eq!(normalize(" a!!    b "), "a b");
+    }
 
     #[test]
     fn everything_is_correct() {
