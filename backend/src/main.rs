@@ -1,7 +1,7 @@
 //! Start-up: config, database pool, migrations, and the three modules' routers behind the shared guards.
 //!
 //! Each module owns its routes, its rules (`rules.rs`, pure functions) and its tables (`store.rs`, SQL):
-//!   auth     — users, sessions
+//!   auth     — users, sessions, auth_credentials
 //!   papers   — papers, questions
 //!   practice — answers, paper_progress
 
@@ -50,6 +50,7 @@ async fn main() {
         ),
     };
     migrate(&state.pool).await;
+    auth::init(&state.pool).await.expect("auth tables");
 
     let api = Router::new()
         .merge(auth::router())

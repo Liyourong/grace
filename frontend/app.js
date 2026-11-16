@@ -81,9 +81,10 @@ function showAuth(mode, message) {
   const isLogin = mode === 'login';
   const msg = h('div', {}, message ? notice('warn', message) : null);
   const username = h('input', { class: 'field', type: 'text', name: 'username', placeholder: '用户名', 'aria-label': '用户名',
-    autocomplete: 'username' });
+    autocomplete: 'username', autocapitalize: 'none', spellcheck: 'false', required: true, minlength: 3, maxlength: 32,
+    'aria-describedby': 'username-hint' });
   const password = h('input', { class: 'field', type: 'password', name: 'password', placeholder: '密码', 'aria-label': '密码',
-    autocomplete: isLogin ? 'current-password' : 'new-password' });
+    autocomplete: isLogin ? 'current-password' : 'new-password', required: true, minlength: 8, 'aria-describedby': 'password-hint' });
   const submit = h('button', { class: 'btn primary wide', type: 'submit' }, isLogin ? '登录' : '创建账户');
 
   const form = h('form', { class: 'auth', onsubmit: async (e) => {
@@ -103,7 +104,9 @@ function showAuth(mode, message) {
     h('h1', {}, isLogin ? '欢迎回来' : '创建你的账户'),
     h('p', { class: 'muted' }, isLogin ? '登录后继续你的练习' : '用自己的试卷练习语言'),
     username,
+    h('p', { class: 'hint', id: 'username-hint' }, '3–32 个字母、数字或下划线，不区分大小写'),
     password,
+    h('p', { class: 'hint', id: 'password-hint' }, '8–128 个字符，区分大小写'),
     msg,
     submit,
     h('p', { class: 'muted small' }, isLogin ? '还没有账户？' : '已有账户？',
