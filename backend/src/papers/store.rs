@@ -23,6 +23,11 @@ pub struct QuestionRow {
     pub kind: Kind,
     pub prompt: String,
     pub options: Option<Vec<Choice>>,
+    /// Server-internal grading keys consumed by `practice` (#18); never serialized to clients.
+    #[allow(dead_code)]
+    pub correct_option_id: Option<String>,
+    #[allow(dead_code)]
+    pub accepted_answers: Vec<String>,
     pub correct_answer: String,
     pub explanation: String,
 }
@@ -30,7 +35,7 @@ pub struct QuestionRow {
 const PAPER_COLUMNS: &str = "SELECT p.id, p.title, p.description, utc_iso(p.created_at), COALESCE(array_agg(q.id ORDER BY q.position) FILTER (WHERE q.id IS NOT NULL), '{}')
      FROM papers p LEFT JOIN questions q ON q.paper_id = p.id";
 
-const QUESTION_COLUMNS: &str = "SELECT q.id, q.local_id, q.position, q.kind, q.prompt, q.options, q.correct_answer, q.explanation
+const QUESTION_COLUMNS: &str = "SELECT q.id, q.local_id, q.position, q.kind, q.prompt, q.options, q.correct_option_id, q.accepted_answers, q.correct_answer, q.explanation
      FROM questions q JOIN papers p ON p.id = q.paper_id";
 
 pub async fn insert(db: &mut Object, owner_id: i64, paper: &PaperFile) -> Result<i64> {
@@ -128,7 +133,9 @@ fn question_row(r: &Row) -> QuestionRow {
         kind: Kind::from_db(r.get(3)),
         prompt: r.get(4),
         options: r.get::<_, Option<Json<Vec<Choice>>>>(5).map(|Json(o)| o),
-        correct_answer: r.get(6),
-        explanation: r.get(7),
+        correct_option_id: r.get(6),
+        accepted_answers: r.get::<_, Option<Json<Vec<String>>>>(7).map(|Json(a)| a).unwrap_or_default(),
+        correct_answer: r.get(8),
+        explanation: r.get(9),
     }
 }
