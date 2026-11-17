@@ -19,6 +19,9 @@ env:
 
 jobs:
   verify:
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
@@ -27,6 +30,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
@@ -48,11 +52,25 @@ jobs:
         run: |
           digest="sha256:$(printf '%064d' 0)"
           bash scripts/render-release.sh "$REGISTRY_IMAGE@$digest" > "$RUNNER_TEMP/preview.yaml"
-      - name: Build and test the release image with PostgreSQL 17
+      - name: Load the original V5 candidate for this retry
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE: 2ec9005497a60632f449c9bd04e2122891da3569
+        run: |
+          git diff --exit-code "$CANDIDATE" HEAD -- . ':!scripts/release-v5.sh' ':!.github/workflows/grace.yml'
+          gh run download 44013671348 -n "release-$CANDIDATE" -D "$RUNNER_TEMP/original"
+          docker load -i "$RUNNER_TEMP/original/image.tar"
+          docker tag "$REGISTRY_IMAGE:$CANDIDATE" grace-ci-app
+      - name: Test the release image with PostgreSQL 17
         env:
           DOCKER_DEFAULT_PLATFORM: linux/amd64
         run: |
-          docker compose up --build -d --wait --wait-timeout 120
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            docker compose up --no-build -d --wait --wait-timeout 120
+          else
+            docker compose up --build -d --wait --wait-timeout 120
+          fi
           python3 tests/smoke.py http://localhost:8090
           mkdir -p "$RUNNER_TEMP/release/site"
           docker compose cp app:/app/frontend/. "$RUNNER_TEMP/release/site/"
