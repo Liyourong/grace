@@ -1,0 +1,124 @@
+name: Grace CI/CD
+
+on:
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grace-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  REGISTRY_IMAGE: registry.digitalocean.com/grace-dev/grace
+  KUBECTL_VERSION: v1.37.0
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      COMPOSE_PROJECT_NAME: grace-ci
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      - name: Rust unit tests
+        run: cargo +stable test --locked --manifest-path backend/Cargo.toml
+      - name: Check the frontend
+        working-directory: frontend
+        run: |
+          if [[ -f package.json || -f package-lock.json ]]; then
+            npm ci
+            npm run lint
+          else
+            node --check app.js
+          fi
+      - name: Render and check the DOKS overlay offline
+        run: |
+          digest="sha256:$(printf '%064d' 0)"
+          bash scripts/render-release.sh "$REGISTRY_IMAGE@$digest" > "$RUNNER_TEMP/preview.yaml"
+      - name: Build and test the release image with PostgreSQL 17
+        env:
+          DOCKER_DEFAULT_PLATFORM: linux/amd64
+        run: |
+          docker compose up --build -d --wait --wait-timeout 120
+          python3 tests/smoke.py http://localhost:8090
+          mkdir -p "$RUNNER_TEMP/release/site"
+          docker compose cp app:/app/frontend/. "$RUNNER_TEMP/release/site/"
+          python3 tests/check_site.py http://localhost:8090 "$RUNNER_TEMP/release/site"
+      - name: Save the tested image
+        if: github.event_name == 'push'
+        run: |
+          container=$(docker compose ps -q app)
+          image_id=$(docker inspect --format '{{.Image}}' "$container")
+          docker tag "$image_id" "$REGISTRY_IMAGE:$GITHUB_SHA"
+          docker save -o "$RUNNER_TEMP/release/image.tar" "$REGISTRY_IMAGE:$GITHUB_SHA"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: github.event_name == 'push'
+        with:
+          name: release-${{ github.sha }}
+          path: ${{ runner.temp }}/release/
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+      - name: Show local startup errors
+        if: failure()
+        run: docker compose logs --tail=80 app db
+      - name: Remove temporary containers and data
+        if: always()
+        run: docker compose down --volumes --remove-orphans
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: ci-cd-pipeline
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check current dev commit
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/dev" --jq .object.sha)
+          if [[ "$head" == "$GITHUB_SHA" ]]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipped superseded commit $GITHUB_SHA (dev is $head)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: steps.head.outputs.current == 'true'
+        with:
+          name: release-${{ github.sha }}
+          path: ${{ runner.temp }}/release
+      - uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4
+        if: steps.head.outputs.current == 'true'
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      - uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2
+        if: steps.head.outputs.current == 'true'
+        with:
+          no_auth: 'true'
+          version: '2.1.0'
+      - name: Authenticate, publish and verify the DOKS release
+        if: steps.head.outputs.current == 'true'
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          KUBECONFIG: ${{ runner.temp }}/grace.kubeconfig
+        run: bash scripts/deploy-dev.sh
