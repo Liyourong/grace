@@ -375,7 +375,7 @@ async function openPaper(paperId) {
       h('div', { class: 'qhead' }, h('span', { class: 'chip' }, kindLabel), h('span', { class: 'muted small' }, `第 ${index + 1} / ${paper.questions.length} 题`)),
       h('p', { class: 'prompt' }, q.prompt),
       input,
-      feedback(q),
+      ...(q.answer ? [feedback(q)] : []),
       h('div', { class: 'qnav' },
         h('button', { class: 'btn ghost', disabled: index === 0, onclick: () => go(index - 1) }, '← 上一题'),
         last ? h('button', { class: 'btn primary', onclick: finish }, '结束练习')
