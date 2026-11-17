@@ -60,20 +60,20 @@ struct Credentials {
 }
 
 fn invalid_username() -> AppError {
-    AppError::bad_request("invalid_username", "用户名需为 3–32 个字母、数字或下划线")
+    AppError::bad_request("invalid_username", "Username must be 3–32 letters, digits or underscores")
 }
 
 fn invalid_password() -> AppError {
-    AppError::bad_request("invalid_password", "密码长度需为 8–128 个字符")
+    AppError::bad_request("invalid_password", "Password must be 8–128 characters")
 }
 
 fn username_taken() -> AppError {
-    AppError::new(StatusCode::CONFLICT, "username_taken", "该用户名已被使用")
+    AppError::new(StatusCode::CONFLICT, "username_taken", "That username is already taken")
 }
 
 /// The one answer for an unknown username and a wrong password, so neither can be told from the other.
 fn invalid_credentials() -> AppError {
-    AppError::new(StatusCode::UNAUTHORIZED, "invalid_credentials", "用户名或密码错误")
+    AppError::new(StatusCode::UNAUTHORIZED, "invalid_credentials", "Incorrect username or password")
 }
 
 /// Hashing and verifying take tens of milliseconds of CPU, so they run off the async workers.

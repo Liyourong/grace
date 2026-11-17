@@ -1,27 +1,16 @@
 <!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Grace</title>
-  <script>
-    // Runs before CSS paints so a saved theme never flashes the wrong colors.
-    (function () {
-      var mq = matchMedia('(prefers-color-scheme: dark)');
-      window.getTheme = function () { try { return localStorage.getItem('theme') || 'system'; } catch (e) { return 'system'; } };
-      window.setTheme = function (t) { try { localStorage.setItem('theme', t); } catch (e) {} applyTheme(); };
-      function applyTheme() {
-        var t = getTheme();
-        document.documentElement.dataset.theme = t === 'system' ? (mq.matches ? 'dark' : 'light') : t;
-      }
-      mq.addEventListener('change', applyTheme);
-      applyTheme();
-    })();
-  </script>
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <div id="app"></div>
-  <script src="/app.js"></script>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grace</title>
+    <script>
+      // Runs before first paint so a saved theme never flashes the wrong colors.
+      try { var t = localStorage.getItem('theme'); if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark') } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
