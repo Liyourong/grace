@@ -273,7 +273,7 @@ def main() -> None:
     assert status == 200, status
     status, restored = fresh.request("GET", f"/api/papers/{pid1}")
     assert status == 200, status
-    assert restored["current_question_id"] == "q2", "CI red probe: deliberately expect q2 after saving q3"
+    assert restored["current_question_id"] == "q3", restored
     assert restored["stats"] == detail_after["stats"], restored
     assert restored["questions"] == detail_after["questions"], restored
     print("All papers, grading, and sign-in recovery checks passed!")
