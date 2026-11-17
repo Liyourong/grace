@@ -1,7 +1,7 @@
-//! Grading and statistics as pure functions. Right now there is no grading: every answer is correct.
-//! Add answer matching here.
+//! Pure answer normalization, grading, and current-answer statistics.
 
 use serde::{Deserialize, Serialize};
+use crate::common::{AppError, Result};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 /// Compare written answers without accents, punctuation, case, or extra whitespace.
@@ -53,10 +53,47 @@ impl Stats {
     }
 }
 
-/// Returns (answer to save, is it correct). Right now every answer counts as correct.
-pub fn grade(s: Submission) -> (String, bool) {
-    let answer = s.option_id.or(s.text).unwrap_or_default().replace('\0', ""); // PostgreSQL TEXT cannot store NUL
-    (answer, true)
+/// The server-side answer key; never send it with an unanswered paper.
+pub enum GradingKey<'a> {
+    Choice {
+        option_ids: Vec<&'a str>,
+        correct_option_id: Option<&'a str>,
+    },
+    Text {
+        accepted_answers: &'a [String],
+    },
+}
+
+fn invalid(message: &'static str) -> AppError {
+    AppError::bad_request("invalid_answer", message)
+}
+
+/// Grade before persisting. Returns the ORIGINAL answer and its grade, or a 400 error.
+pub fn grade(submission: Submission, key: GradingKey<'_>) -> Result<(String, bool)> {
+    match key {
+        GradingKey::Choice { option_ids, correct_option_id } => {
+            let selected = submission.option_id
+                .ok_or_else(|| invalid("选择题需要提交 option_id"))?;
+            if !option_ids.iter().any(|id| *id == selected.as_str()) {
+                return Err(invalid("该选项不属于本题"));
+            }
+            let is_correct = Some(selected.as_str()) == correct_option_id;
+            Ok((selected, is_correct))
+        }
+        GradingKey::Text { accepted_answers } => {
+            let original = submission.text
+                .ok_or_else(|| invalid("需要提交 text"))?;
+            if original.contains('\0') || original.chars().count() > 2_000 {
+                return Err(invalid("答案不能超过 2000 个字符，也不能包含 NUL 字符"));
+            }
+            let normalized = normalize(&original);
+            if normalized.is_empty() {
+                return Err(invalid("答案不能为空"));
+            }
+            let is_correct = accepted_answers.iter().any(|answer| normalize(answer) == normalized);
+            Ok((original, is_correct))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -85,11 +122,65 @@ mod tests {
         assert_eq!(normalize(" a!!    b "), "a b");
     }
 
+    fn choice(id: Option<&str>) -> Submission {
+        Submission { option_id: id.map(str::to_owned), text: None }
+    }
+
+    fn text(input: Option<&str>) -> Submission {
+        Submission { option_id: None, text: input.map(str::to_owned) }
+    }
+
+    fn choice_key<'a>() -> GradingKey<'a> {
+        GradingKey::Choice { option_ids: vec!["a", "b"], correct_option_id: Some("a") }
+    }
+
+    fn text_key<'a>(answers: &'a [String]) -> GradingKey<'a> {
+        GradingKey::Text { accepted_answers: answers }
+    }
+
     #[test]
-    fn everything_is_correct() {
-        let s = Submission { option_id: None, text: Some("anything".into()) };
-        assert_eq!(grade(s), ("anything".into(), true));
-        let s = Stats::of(3, [true, false]);
-        assert_eq!((s.answered, s.correct, s.incorrect, s.unanswered), (2, 1, 1, 1));
+    fn grades_choice_by_known_option_ids() {
+        assert_eq!(grade(choice(Some("a")), choice_key()).unwrap(), ("a".into(), true));
+        assert_eq!(grade(choice(Some("b")), choice_key()).unwrap(), ("b".into(), false));
+        assert!(grade(choice(Some("z")), choice_key()).is_err());
+        assert!(grade(choice(None), choice_key()).is_err());
+        let only_text = Submission { option_id: None, text: Some("a".into()) };
+        assert!(grade(only_text, choice_key()).is_err());
+    }
+
+    #[test]
+    fn grades_text_using_all_accepted_answers_and_preserves_original() {
+        let answers = vec!["Bonjour".into(), "Merci !".into()];
+        assert_eq!(
+            grade(text(Some("  merci!! ")), text_key(&answers)).unwrap(),
+            ("  merci!! ".into(), true),
+        );
+        assert_eq!(
+            grade(text(Some("salut")), text_key(&answers)).unwrap(),
+            ("salut".into(), false),
+        );
+    }
+
+    #[test]
+    fn rejects_missing_empty_oversized_or_nul_text() {
+        let answers = vec!["merci".to_owned()];
+        assert!(grade(text(None), text_key(&answers)).is_err());
+        assert!(grade(text(Some(" ?! ... ")), text_key(&answers)).is_err());
+        assert!(grade(text(Some("ok\0bye")), text_key(&answers)).is_err());
+        let boundary = "a".repeat(2_000);
+        let over = "a".repeat(2_001);
+        assert_eq!(grade(text(Some(&boundary)), text_key(&answers)).unwrap().0, boundary);
+        assert!(grade(text(Some(&over)), text_key(&answers)).is_err());
+        // char-count boundary: a multibyte Unicode scalar is one Rust char.
+        let unicode_boundary = "é".repeat(2_000);
+        assert!(grade(text(Some(&unicode_boundary)), text_key(&answers)).is_ok());
+    }
+
+    #[test]
+    fn stats_count_current_answers_not_submission_history() {
+        let s = Stats::of(4, [true, false, true]);
+        assert_eq!((s.total, s.answered, s.correct, s.incorrect, s.unanswered), (4, 3, 2, 1, 1));
+        let s = Stats::of(3, [true]);
+        assert_eq!((s.total, s.answered, s.correct, s.incorrect, s.unanswered), (3, 1, 1, 0, 2));
     }
 }
