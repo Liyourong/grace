@@ -35,11 +35,15 @@ jobs:
           version: ${{ env.KUBECTL_VERSION }}
       - name: Rust unit tests
         run: cargo +stable test --locked --manifest-path backend/Cargo.toml
-      - name: Frontend lint
+      - name: Check the frontend
         working-directory: frontend
         run: |
-          npm ci
-          npm run lint
+          if [[ -f package.json || -f package-lock.json ]]; then
+            npm ci
+            npm run lint
+          else
+            node --check app.js
+          fi
       - name: Render and check the DOKS overlay offline
         run: |
           digest="sha256:$(printf '%064d' 0)"

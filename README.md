@@ -40,9 +40,10 @@ refactor(api): simplify request validation
 ## CI and deployment
 
 A PR to `dev` runs the `verify` check on an isolated Linux runner. It runs Rust tests,
-frontend lint, an offline render of the DOKS configuration, and the HTTP smoke tests
-against the production image and a temporary PostgreSQL 17 database. The Docker build
-also type-checks the frontend. The check compares the served homepage, JavaScript and
+frontend checks, an offline render of the DOKS configuration, and the HTTP smoke tests
+against the production image and a temporary PostgreSQL 17 database. For the static frontend,
+CI checks JavaScript syntax. For the npm frontend, CI runs lint and the Docker build
+type-checks the application. The check compares the served homepage, JavaScript and
 CSS with the files from the image. It does not exercise browser interactions.
 
 ### Enable the first release
