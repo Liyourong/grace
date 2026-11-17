@@ -12,6 +12,7 @@ from __future__ import annotations
 import http.cookiejar
 import json
 import os
+import secrets
 import sys
 import time
 import urllib.error
@@ -171,16 +172,18 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     print("Practice grading smoke checks passed!")
 
 def main() -> None:
-    suffix = str(int(time.time() * 1000))
+    suffix = secrets.token_hex(8)
+    credentials_a = {"username": f"smoke_a_{suffix}", "password": secrets.token_urlsafe(24)}
+    credentials_b = {"username": f"smoke_b_{suffix}", "password": secrets.token_urlsafe(24)}
     user_a = Client(BASE_URL)
     user_b = Client(BASE_URL)
 
     wait_ready(user_a)
 
     # Sign in two distinct users.
-    status, data = user_a.request("POST", "/api/auth/register", {"username": f"smoke_a_{suffix}", "password": "smoke-password-123"})
+    status, data = user_a.request("POST", "/api/auth/register", credentials_a)
     assert status in (200, 201), f"user A register failed: {status} {data}"
-    status, data = user_b.request("POST", "/api/auth/register", {"username": f"smoke_b_{suffix}", "password": "smoke-password-123"})
+    status, data = user_b.request("POST", "/api/auth/register", credentials_b)
     assert status in (200, 201), f"user B register failed: {status} {data}"
 
     # Default paper is provisioned once on first list.
@@ -258,7 +261,22 @@ def main() -> None:
         assert "correct_option_id" not in q
         assert "accepted_answers" not in q
     check_practice_grading(user_a, pid2)
-    print("All papers and practice smoke checks passed!")
+    # Resume in a fresh browser session, at a question different from the one answered.
+    status, _ = user_a.request("PUT", f"/api/papers/{pid1}/position", {"question_id": "q3"})
+    assert status == 204, status
+    status, _ = user_a.request("POST", "/api/auth/logout")
+    assert status == 204, status
+    status, _ = user_a.request("GET", f"/api/papers/{pid1}")
+    assert status == 401, status
+    fresh = Client(BASE_URL)
+    status, _ = fresh.request("POST", "/api/auth/login", credentials_a)
+    assert status == 200, status
+    status, restored = fresh.request("GET", f"/api/papers/{pid1}")
+    assert status == 200, status
+    assert restored["current_question_id"] == "q3", restored
+    assert restored["stats"] == detail_after["stats"], restored
+    assert restored["questions"] == detail_after["questions"], restored
+    print("All papers, grading, and sign-in recovery checks passed!")
 
 
 if __name__ == "__main__":
