@@ -77,23 +77,23 @@ pub fn valid_id(id: &str) -> bool {
 /// Validates and parses a v1 paper JSON value, collecting all independent errors.
 pub fn parse(file: &Value) -> Result<PaperFile, Vec<String>> {
     let Some(root) = file.as_object() else {
-        return Err(vec!["试卷文件必须是 JSON 对象".into()]);
+        return Err(vec!["The paper file must be a JSON object".into()]);
     };
 
     let mut errors = Vec::new();
     let format_version = match root.get("format_version") {
         None | Some(Value::Null) => {
-            errors.push("缺少 format_version".into());
+            errors.push("format_version is missing".into());
             None
         }
         Some(v) => match v.as_i64() {
             Some(1) => Some(1),
             Some(_) => {
-                errors.push("format_version 必须为 1".into());
+                errors.push("format_version must be 1".into());
                 None
             }
             None => {
-                errors.push("format_version 必须为整数 1".into());
+                errors.push("format_version must be the integer 1".into());
                 None
             }
         },
@@ -104,12 +104,12 @@ pub fn parse(file: &Value) -> Result<PaperFile, Vec<String>> {
 
     let mut questions = Vec::new();
     match root.get("questions") {
-        None | Some(Value::Null) => errors.push("缺少 questions 数组".into()),
+        None | Some(Value::Null) => errors.push("questions array is missing".into()),
         Some(v) => match v.as_array() {
-            None => errors.push("questions 必须是数组".into()),
+            None => errors.push("questions must be an array".into()),
             Some(arr) => {
                 if arr.is_empty() || arr.len() > MAX_QUESTIONS {
-                    errors.push(format!("questions 数量必须在 1–{MAX_QUESTIONS} 之间"));
+                    errors.push(format!("questions count must be between 1 and {MAX_QUESTIONS}"));
                 }
                 let mut seen_ids = HashSet::new();
                 for (i, item) in arr.iter().enumerate() {
@@ -140,16 +140,16 @@ fn parse_question(
     errors: &mut Vec<String>,
 ) -> Option<Question> {
     let Some(obj) = raw.as_object() else {
-        errors.push(format!("第 {num} 题：必须是 JSON 对象"));
+        errors.push(format!("Question {num}: must be a JSON object"));
         return None;
     };
 
-    let prefix = format!("第 {num} 题");
-    let id = required_unique_id(obj, &prefix, "与前面的题目重复", seen_ids, errors);
+    let prefix = format!("Question {num}");
+    let id = required_unique_id(obj, &prefix, "duplicates an earlier question", seen_ids, errors);
     let kind = parse_kind(obj, &prefix, errors);
-    let prompt = required_text(obj, "prompt", &format!("{prefix}：prompt"), MAX_TEXT_CHARS, errors);
-    let correct_answer = required_text(obj, "correct_answer", &format!("{prefix}：correct_answer"), MAX_TEXT_CHARS, errors);
-    let explanation = required_text(obj, "explanation", &format!("{prefix}：explanation"), MAX_TEXT_CHARS, errors);
+    let prompt = required_text(obj, "prompt", &format!("{prefix}: prompt"), MAX_TEXT_CHARS, errors);
+    let correct_answer = required_text(obj, "correct_answer", &format!("{prefix}: correct_answer"), MAX_TEXT_CHARS, errors);
+    let explanation = required_text(obj, "explanation", &format!("{prefix}: explanation"), MAX_TEXT_CHARS, errors);
 
     let (options, correct_option_id, accepted_answers) = match kind {
         Some(Kind::Choice) => {
@@ -178,7 +178,7 @@ fn parse_question(
 fn reject_disallowed_field(obj: &Map<String, Value>, prefix: &str, kind: Kind, field: &str, errors: &mut Vec<String>) {
     // Reject non-null fields that belong to another question type so malformed hybrid questions fail fast.
     if obj.get(field).is_some_and(|v| !v.is_null()) {
-        errors.push(format!("{prefix}：{} 题不能包含 {field}", kind.as_str()));
+        errors.push(format!("{prefix}: {} questions must not include {field}", kind.as_str()));
     }
 }
 
@@ -194,22 +194,22 @@ fn parse_choice_fields(
     let mut has_options_array = false;
 
     match obj.get("options") {
-        None | Some(Value::Null) => errors.push(format!("{prefix}：缺少 options")),
+        None | Some(Value::Null) => errors.push(format!("{prefix}: options is missing")),
         Some(v) => match v.as_array() {
-            None => errors.push(format!("{prefix}：options 必须是数组")),
+            None => errors.push(format!("{prefix}: options must be an array")),
             Some(arr) => {
                 has_options_array = true;
                 if !(MIN_OPTIONS..=MAX_OPTIONS).contains(&arr.len()) {
-                    errors.push(format!("{prefix}：options 数量必须在 {MIN_OPTIONS}–{MAX_OPTIONS} 之间"));
+                    errors.push(format!("{prefix}: options count must be between {MIN_OPTIONS} and {MAX_OPTIONS}"));
                 }
                 for (j, raw_opt) in arr.iter().enumerate() {
-                    let opt_prefix = format!("{prefix}第 {} 个选项", j + 1);
+                    let opt_prefix = format!("{prefix}, option {}", j + 1);
                     let Some(opt_obj) = raw_opt.as_object() else {
-                        errors.push(format!("{opt_prefix}：必须是 JSON 对象"));
+                        errors.push(format!("{opt_prefix}: must be a JSON object"));
                         continue;
                     };
-                    let opt_id = required_unique_id(opt_obj, &opt_prefix, "与前面的选项重复", &mut seen_option_ids, errors);
-                    let opt_text = required_text(opt_obj, "text", &format!("{opt_prefix}：text"), MAX_TEXT_CHARS, errors);
+                    let opt_id = required_unique_id(opt_obj, &opt_prefix, "duplicates an earlier option", &mut seen_option_ids, errors);
+                    let opt_text = required_text(opt_obj, "text", &format!("{opt_prefix}: text"), MAX_TEXT_CHARS, errors);
                     if let (Some(id), Some(text)) = (opt_id, opt_text) {
                         options.push(Choice { id, text });
                     }
@@ -220,12 +220,12 @@ fn parse_choice_fields(
 
     let correct_option_id = match obj.get("correct_option_id") {
         None | Some(Value::Null) => {
-            errors.push(format!("{prefix}：缺少 correct_option_id"));
+            errors.push(format!("{prefix}: correct_option_id is missing"));
             None
         }
-        Some(v) => check_nonblank_text(v, &format!("{prefix}：correct_option_id"), MAX_ID_CHARS, errors).and_then(|s| {
+        Some(v) => check_nonblank_text(v, &format!("{prefix}: correct_option_id"), MAX_ID_CHARS, errors).and_then(|s| {
             if has_options_array && !seen_option_ids.contains(&s) {
-                errors.push(format!("{prefix}：correct_option_id \"{s}\" 不是本题的选项"));
+                errors.push(format!("{prefix}: correct_option_id \"{s}\" is not one of this question's options"));
                 None
             } else {
                 Some(s)
@@ -247,20 +247,20 @@ fn parse_accepted_answers(
 
     let mut accepted = Vec::new();
     match obj.get("accepted_answers") {
-        None | Some(Value::Null) => errors.push(format!("{prefix}：缺少 accepted_answers")),
+        None | Some(Value::Null) => errors.push(format!("{prefix}: accepted_answers is missing")),
         Some(v) => match v.as_array() {
-            None => errors.push(format!("{prefix}：accepted_answers 必须是数组")),
+            None => errors.push(format!("{prefix}: accepted_answers must be an array")),
             Some(arr) => {
                 if !(MIN_ACCEPTED_ANSWERS..=MAX_ACCEPTED_ANSWERS).contains(&arr.len()) {
                     errors.push(format!(
-                        "{prefix}：accepted_answers 数量必须在 {MIN_ACCEPTED_ANSWERS}–{MAX_ACCEPTED_ANSWERS} 之间"
+                        "{prefix}: accepted_answers count must be between {MIN_ACCEPTED_ANSWERS} and {MAX_ACCEPTED_ANSWERS}"
                     ));
                 }
                 for (j, raw_ans) in arr.iter().enumerate() {
-                    let label = format!("{prefix}：accepted_answers 第 {} 项", j + 1);
+                    let label = format!("{prefix}: accepted_answers item {}", j + 1);
                     if let Some(ans) = check_nonblank_text(raw_ans, &label, MAX_TEXT_CHARS, errors) {
                         if crate::practice::normalize(&ans).is_empty() {
-                            errors.push(format!("{label} 规范化后不能为空"));
+                            errors.push(format!("{label} must not be empty after normalization"));
                         } else {
                             accepted.push(ans);
                         }
@@ -275,19 +275,19 @@ fn parse_accepted_answers(
 fn parse_kind(obj: &Map<String, Value>, prefix: &str, errors: &mut Vec<String>) -> Option<Kind> {
     match obj.get("type") {
         None | Some(Value::Null) => {
-            errors.push(format!("{prefix}：缺少 type"));
+            errors.push(format!("{prefix}: type is missing"));
             None
         }
         Some(v) => match v.as_str() {
             None => {
-                errors.push(format!("{prefix}：type 必须是字符串"));
+                errors.push(format!("{prefix}: type must be a string"));
                 None
             }
             Some("choice") => Some(Kind::Choice),
             Some("translation") => Some(Kind::Translation),
             Some("sentence") => Some(Kind::Sentence),
             Some(_) => {
-                errors.push(format!("{prefix}：type 必须是 choice、translation 或 sentence"));
+                errors.push(format!("{prefix}: type must be choice, translation or sentence"));
                 None
             }
         },
@@ -303,17 +303,17 @@ fn required_unique_id(
 ) -> Option<String> {
     match obj.get("id") {
         None | Some(Value::Null) => {
-            errors.push(format!("{prefix}：缺少 id"));
+            errors.push(format!("{prefix}: id is missing"));
             None
         }
         Some(v) => {
-            let s = check_string(v, &format!("{prefix}：id"), MAX_ID_CHARS, errors)?;
+            let s = check_string(v, &format!("{prefix}: id"), MAX_ID_CHARS, errors)?;
             if !valid_id(s) {
-                errors.push(format!("{prefix}：id 必须为 1–{MAX_ID_CHARS} 个 ASCII 字母、数字、_ 或 -"));
+                errors.push(format!("{prefix}: id must be 1–{MAX_ID_CHARS} ASCII letters, digits, _ or -"));
                 return None;
             }
             if !seen.insert(s.to_string()) {
-                errors.push(format!("{prefix}：id \"{s}\" {dup_suffix}"));
+                errors.push(format!("{prefix}: id \"{s}\" {dup_suffix}"));
                 return None;
             }
             Some(s.to_string())
@@ -329,15 +329,15 @@ pub fn default_paper() -> PaperFile {
 
 fn check_string<'a>(v: &'a Value, label: &str, max_chars: usize, errors: &mut Vec<String>) -> Option<&'a str> {
     let Some(s) = v.as_str() else {
-        errors.push(format!("{label} 必须是字符串"));
+        errors.push(format!("{label} must be a string"));
         return None;
     };
     if s.contains('\0') {
-        errors.push(format!("{label} 不能包含 NUL 字符"));
+        errors.push(format!("{label} must not contain NUL characters"));
         return None;
     }
     if s.chars().count() > max_chars {
-        errors.push(format!("{label} 不能超过 {max_chars} 个字符"));
+        errors.push(format!("{label} must be at most {max_chars} characters"));
         return None;
     }
     Some(s)
@@ -352,7 +352,7 @@ fn required_text(
 ) -> Option<String> {
     match obj.get(key) {
         None | Some(Value::Null) => {
-            errors.push(format!("缺少 {label}"));
+            errors.push(format!("{label} is missing"));
             None
         }
         Some(v) => check_nonblank_text(v, label, max_chars, errors),
@@ -362,7 +362,7 @@ fn required_text(
 fn check_nonblank_text(v: &Value, label: &str, max_chars: usize, errors: &mut Vec<String>) -> Option<String> {
     let s = check_string(v, label, max_chars, errors)?;
     if s.trim().is_empty() {
-        errors.push(format!("{label} 不能为空"));
+        errors.push(format!("{label} must not be empty"));
         return None;
     }
     // Preserve leading/trailing whitespace as entered by the author.
@@ -434,8 +434,8 @@ mod tests {
         let sample: Value = serde_json::from_str(include_str!("../../../examples/french-basics.json")).unwrap();
         let p = parse(&sample).expect("french-basics.json should parse");
         assert_eq!(p.format_version, 1);
-        assert_eq!(p.title, "法语基础练习");
-        assert_eq!(p.description.as_deref(), Some("一份包含三种题型的示例试卷。"));
+        assert_eq!(p.title, "French Basics");
+        assert_eq!(p.description.as_deref(), Some("A sample paper with all three question types."));
         let ids: Vec<_> = p.questions.iter().map(|q| q.id.as_str()).collect();
         let kinds: Vec<_> = p.questions.iter().map(|q| q.kind).collect();
         assert_eq!(ids, ["q1", "q2", "q3"]);
@@ -493,14 +493,14 @@ mod tests {
         }))
         .unwrap_err();
         assert!(errs.iter().any(|e| e.contains("title")));
-        assert!(errs.iter().any(|e| e.contains("第 1 题：accepted_answers 数量")));
-        assert!(errs.iter().any(|e| e.contains("第 1 题：translation 题不能包含 options")));
-        assert!(errs.iter().any(|e| e.contains("第 1 题：translation 题不能包含 correct_option_id")));
-        assert!(errs.iter().any(|e| e.contains("第 2 题：accepted_answers 数量")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：accepted_answers 第 1 项")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：accepted_answers 第 2 项")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：accepted_answers 第 3 项")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：accepted_answers 第 4 项")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: accepted_answers count")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: translation questions must not include options")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: translation questions must not include correct_option_id")));
+        assert!(errs.iter().any(|e| e.contains("Question 2: accepted_answers count")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: accepted_answers item 1")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: accepted_answers item 2")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: accepted_answers item 3")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: accepted_answers item 4")));
 
         // 200-char title passes; whitespace preserved; whitespace-only description -> None; forged owner_id ignored.
         let p = parse(&json!({
@@ -542,7 +542,7 @@ mod tests {
             "questions": too_many
         }))
         .unwrap_err();
-        assert!(errs.iter().any(|e| e.contains("questions 数量必须在 1–200 之间")));
+        assert!(errs.iter().any(|e| e.contains("questions count must be between 1 and 200")));
 
         // Upper boundaries that pass: 200 multi-byte chars title, 200 questions, 10 options, 20 accepted answers.
         let ten_opts: Vec<Value> = (1..=10).map(|i| json!({ "id": format!("o{i}"), "text": "opt" })).collect();
@@ -627,12 +627,12 @@ mod tests {
             ]
         }))
         .unwrap_err();
-        assert!(errs.iter().any(|e| e.contains("第 1 题：options 数量必须在 2–10 之间")));
-        assert!(errs.iter().any(|e| e.contains("第 1 题：correct_option_id \"z\" 不是本题的选项")));
-        assert!(errs.iter().any(|e| e.contains("第 1 题：choice 题不能包含 accepted_answers")));
-        assert!(errs.iter().any(|e| e.contains("第 2 题：options 数量必须在 2–10 之间")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题第 1 个选项：text")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题第 2 个选项：id \"a\" 与前面的选项重复")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: options count must be between 2 and 10")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: correct_option_id \"z\" is not one of this question's options")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: choice questions must not include accepted_answers")));
+        assert!(errs.iter().any(|e| e.contains("Question 2: options count must be between 2 and 10")));
+        assert!(errs.iter().any(|e| e.contains("Question 3, option 1: text")));
+        assert!(errs.iter().any(|e| e.contains("Question 3, option 2: id \"a\" duplicates an earlier option")));
     }
 
     #[test]
@@ -662,17 +662,17 @@ mod tests {
         }))
         .unwrap_err();
         assert_eq!(errs.len(), 6);
-        assert!(errs.iter().any(|e| e.contains("第 2 题：type")));
-        assert!(errs.iter().any(|e| e.contains("第 2 题：prompt") && e.contains("NUL")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：id \"q1\" 与前面的题目重复")));
+        assert!(errs.iter().any(|e| e.contains("Question 2: type")));
+        assert!(errs.iter().any(|e| e.contains("Question 2: prompt") && e.contains("NUL")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: id \"q1\" duplicates an earlier question")));
     }
 
     #[test]
     fn covers_remaining_missing_and_wrong_type_rejections() {
         let errs = parse(&json!({})).unwrap_err();
-        assert!(errs.iter().any(|e| e.contains("缺少 format_version")));
-        assert!(errs.iter().any(|e| e.contains("缺少 title")));
-        assert!(errs.iter().any(|e| e.contains("缺少 questions")));
+        assert!(errs.iter().any(|e| e.contains("format_version is missing")));
+        assert!(errs.iter().any(|e| e.contains("title is missing")));
+        assert!(errs.iter().any(|e| e.contains("questions array is missing")));
 
         let errs = parse(&json!({
             "format_version": "1",
@@ -681,10 +681,10 @@ mod tests {
             "questions": "bad"
         }))
         .unwrap_err();
-        assert!(errs.iter().any(|e| e.contains("format_version 必须为整数 1")));
-        assert!(errs.iter().any(|e| e.contains("title 必须是字符串")));
-        assert!(errs.iter().any(|e| e.contains("description 不能超过 2000 个字符")));
-        assert!(errs.iter().any(|e| e.contains("questions 必须是数组")));
+        assert!(errs.iter().any(|e| e.contains("format_version must be the integer 1")));
+        assert!(errs.iter().any(|e| e.contains("title must be a string")));
+        assert!(errs.iter().any(|e| e.contains("description must be at most 2000 characters")));
+        assert!(errs.iter().any(|e| e.contains("questions must be an array")));
 
         let errs = parse(&json!({
             "format_version": 1,
@@ -693,7 +693,7 @@ mod tests {
             "questions": []
         }))
         .unwrap_err();
-        assert!(errs.iter().any(|e| e.contains("description 必须是字符串")));
+        assert!(errs.iter().any(|e| e.contains("description must be a string")));
 
         let errs = parse(&json!({
             "format_version": 1,
@@ -742,22 +742,22 @@ mod tests {
             ]
         }))
         .unwrap_err();
-        assert!(errs.iter().any(|e| e.contains("第 1 题：缺少 id")));
-        assert!(errs.iter().any(|e| e.contains("第 1 题：缺少 type")));
-        assert!(errs.iter().any(|e| e.contains("缺少 第 1 题：prompt")));
-        assert!(errs.iter().any(|e| e.contains("缺少 第 1 题：correct_answer")));
-        assert!(errs.iter().any(|e| e.contains("缺少 第 1 题：explanation")));
-        assert!(errs.iter().any(|e| e.contains("第 2 题：id 必须为 1–64")));
-        assert!(errs.iter().any(|e| e.contains("第 2 题：type 必须是字符串")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：id 不能包含 NUL 字符")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：options 必须是数组")));
-        assert!(errs.iter().any(|e| e.contains("第 3 题：缺少 correct_option_id")));
-        assert!(errs.iter().any(|e| e.contains("第 4 题第 1 个选项：必须是 JSON 对象")));
-        assert!(errs.iter().any(|e| e.contains("第 4 题第 2 个选项：id 必须是字符串")));
-        assert!(errs.iter().any(|e| e.contains("第 4 题第 2 个选项：text 不能超过 2000 个字符")));
-        assert!(errs.iter().any(|e| e.contains("第 5 题：accepted_answers 必须是数组")));
-        assert!(errs.iter().any(|e| e.contains("第 6 题：id 必须是字符串")));
-        assert!(errs.iter().any(|e| e.contains("第 6 题：缺少 accepted_answers")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: id is missing")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: type is missing")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: prompt is missing")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: correct_answer is missing")));
+        assert!(errs.iter().any(|e| e.contains("Question 1: explanation is missing")));
+        assert!(errs.iter().any(|e| e.contains("Question 2: id must be 1–64")));
+        assert!(errs.iter().any(|e| e.contains("Question 2: type must be a string")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: id must not contain NUL characters")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: options must be an array")));
+        assert!(errs.iter().any(|e| e.contains("Question 3: correct_option_id is missing")));
+        assert!(errs.iter().any(|e| e.contains("Question 4, option 1: must be a JSON object")));
+        assert!(errs.iter().any(|e| e.contains("Question 4, option 2: id must be a string")));
+        assert!(errs.iter().any(|e| e.contains("Question 4, option 2: text must be at most 2000 characters")));
+        assert!(errs.iter().any(|e| e.contains("Question 5: accepted_answers must be an array")));
+        assert!(errs.iter().any(|e| e.contains("Question 6: id must be a string")));
+        assert!(errs.iter().any(|e| e.contains("Question 6: accepted_answers is missing")));
     }
 
     #[test]
@@ -786,8 +786,8 @@ mod tests {
         }))
         .unwrap_err();
         assert_eq!(errs.len(), 3, "expected 3 errors, got: {errs:?}");
-        assert!(errs[0].contains("第 1 题：accepted_answers 第 1 项"));
-        assert!(errs[1].contains("第 1 题：accepted_answers 第 3 项"));
-        assert!(errs[2].contains("第 2 题：accepted_answers 第 1 项"));
+        assert!(errs[0].contains("Question 1: accepted_answers item 1"));
+        assert!(errs[1].contains("Question 1: accepted_answers item 3"));
+        assert!(errs[2].contains("Question 2: accepted_answers item 1"));
     }
 }

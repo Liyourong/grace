@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [dev]
   push:
-    branches: [dev]
+    tags: [cd-test-v5]
 
 permissions:
   contents: read
@@ -80,25 +80,25 @@ jobs:
         run: docker compose down --volumes --remove-orphans
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/cd-test-v5'
     needs: verify
     runs-on: ubuntu-24.04
-    environment: production
+    environment: ci-cd-pipeline
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Check current dev commit
+      - name: Check V5 release branch
         id: head
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/dev" --jq .object.sha)
+          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/ci/cd-v5" --jq .object.sha)
           if [[ "$head" == "$GITHUB_SHA" ]]; then
             echo 'current=true' >> "$GITHUB_OUTPUT"
           else
-            echo "Skipped superseded commit $GITHUB_SHA (dev is $head)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Skipped superseded commit $GITHUB_SHA (ci/cd-v5 is $head)." >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: steps.head.outputs.current == 'true'
@@ -114,40 +114,10 @@ jobs:
         with:
           no_auth: 'true'
           version: '2.1.0'
-      - name: Authenticate, publish and verify the DOKS release
+      - name: Publish and verify the V5 rehearsal on DOKS
         if: steps.head.outputs.current == 'true'
         env:
           DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           KUBECONFIG: ${{ runner.temp }}/grace.kubeconfig
-        run: |
-          : "${DIGITALOCEAN_ACCESS_TOKEN:?Missing production environment secret}"
-          doctl registry login --expiry-seconds 1800
-          doctl kubernetes cluster kubeconfig save grace --expiry-seconds 1800
-          docker load -i "$RUNNER_TEMP/release/image.tar"
-          tag="$REGISTRY_IMAGE:$GITHUB_SHA"
-          docker push "$tag"
-          image=$(docker image inspect "$tag" --format '{{range .RepoDigests}}{{println .}}{{end}}' | grep -F "$REGISTRY_IMAGE@")
-          manifest="$RUNNER_TEMP/release.yaml"
-          bash scripts/render-release.sh "$image" > "$manifest"
-
-          previous=$(kubectl -n grace get deployment/app -o jsonpath='{.spec.template.spec.containers[0].image}')
-          echo "Cluster: grace | Commit: $GITHUB_SHA | Previous: $previous | Target: $image" >> "$GITHUB_STEP_SUMMARY"
-          kubectl -n grace apply --dry-run=server -f "$manifest"
-          head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/dev" --jq .object.sha)
-          if [[ "$head" != "$GITHUB_SHA" ]]; then
-            echo "Skipped cluster update: dev moved to $head." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          kubectl -n grace apply -f "$manifest"
-          for resource in statefulset/db deployment/app deployment/caddy; do
-            kubectl -n grace rollout status "$resource" --timeout=4m
-          done
-          kubectl -n grace get deployment/app -o json | jq -e --arg image "$image" '
-            any(.spec.template.spec.containers[]; .name == "grace" and .image == $image)
-            and (.status.readyReplicas > 0 and .status.readyReplicas == .spec.replicas)'
-          kubectl -n grace wait --for=jsonpath='{.status.phase}'=Bound pvc/data-db-0 --timeout=60s
-          config=$(kubectl -n grace get deployment/app -o jsonpath='{.spec.template.spec.containers[0].envFrom[0].configMapRef.name}')
-          host=$(kubectl -n grace get configmap "$config" -o jsonpath='{.data.SITE_HOST}')
-          python3 tests/check_site.py "https://$host" "$RUNNER_TEMP/release/site"
-          echo "Verified $image on https://$host (workloads ready, database PVC bound, public health and frontend passed)." >> "$GITHUB_STEP_SUMMARY"
+        run: bash scripts/release-v5.sh

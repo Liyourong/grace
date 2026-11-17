@@ -7,7 +7,7 @@ resources:
 images:
   - name: grace
     newName: registry.digitalocean.com/grace-dev/grace
-    newTag: v3
+    newTag: v4
 configMapGenerator:
   - name: grace-config
     behavior: merge

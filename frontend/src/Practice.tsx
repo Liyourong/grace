@@ -1,0 +1,300 @@
+import { useEffect, useRef, useState } from "react"
+import { ArrowLeft, ArrowRight, ArrowUp, Check, X } from "lucide-react"
+
+import { api, type Answer, type ApiError, type Paper, type Question, type Stats } from "@/api"
+import { Notice } from "@/components/notice"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+
+const KIND_LABEL = { choice: "Multiple choice", translation: "Translation", sentence: "Sentence" }
+// shadcn has no success token; these two are the only colors outside the theme.
+const OK = "border-emerald-600/50! text-emerald-700 dark:text-emerald-400"
+const BAD = "border-destructive/50! text-destructive"
+
+type Warn = { kind: "error" | "warn"; message: string }
+
+export function Practice(props: {
+  paperId: string
+  onExpired: (what: string) => void
+  onChanged: () => void
+  onHome: () => void
+}) {
+  const { paperId, onExpired, onChanged, onHome } = props
+  const base = `/api/papers/${encodeURIComponent(paperId)}`
+  const [paper, setPaper] = useState<Paper | null>(null)
+  const [loadError, setLoadError] = useState<ApiError | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  const [index, setIndex] = useState(0)
+  const [warn, setWarn] = useState<Warn | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [finished, setFinished] = useState(false)
+  // Unsubmitted text lives only in this page; it is never saved or restored.
+  const [drafts, setDrafts] = useState(() => new Map<string, string>())
+  // Answer and position writes both move the saved position, so send them strictly in click order.
+  const queue = useRef<Promise<unknown>>(Promise.resolve())
+  function send<T>(method: string, path: string, body?: unknown) {
+    const next = queue.current.then(() => api<T>(method, path, body))
+    queue.current = next
+    return next
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    api<Paper>("GET", base).then((r) => {
+      if (cancelled) return
+      if (r.ok) {
+        setPaper(r.data)
+        setIndex(Math.max(0, r.data.questions.findIndex((q) => q.id === r.data.current_question_id)))
+      } else if (r.status === 401) onExpired("the paper could not be opened")
+      else setLoadError(r.error)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [base, attempt, onExpired])
+
+  if (loadError)
+    return (
+      <Notice kind="error" message={loadError.message} details={loadError.details}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setLoadError(null)
+            setAttempt(attempt + 1)
+          }}
+        >
+          Retry
+        </Button>
+      </Notice>
+    )
+  if (!paper) return <p className="text-muted-foreground">Loading paper…</p>
+  if (!paper.questions.length) return <p className="text-muted-foreground">This paper has no questions.</p>
+
+  const { questions, stats } = paper
+  const q = questions[index]
+  const last = index === questions.length - 1
+
+  async function go(i: number) {
+    setIndex(i)
+    setFinished(false)
+    const r = await send("PUT", `${base}/position`, { question_id: questions[i].id })
+    if (r.ok) setWarn(null)
+    else if (r.status === 401) onExpired("your position was not saved")
+    else setWarn({ kind: "warn", message: `Your position was not saved: ${r.error.message}` })
+  }
+
+  async function submit(q: Question, payload: { option_id: string } | { text: string }) {
+    setBusy(true)
+    const r = await send<{ answer: Answer; stats: Stats }>("PUT", `${base}/answers/${encodeURIComponent(q.id)}`, payload)
+    setBusy(false)
+    const num = questions.indexOf(q) + 1
+    if (r.ok) {
+      const { answer, stats } = r.data
+      setDrafts((previous) => {
+        if (!previous.has(q.id)) return previous
+        const next = new Map(previous)
+        next.delete(q.id)
+        return next
+      })
+      setPaper((p) => p && { ...p, stats, questions: p.questions.map((x) => (x.id === q.id ? { ...x, answer } : x)) })
+      setWarn(null)
+      onChanged()
+    } else if (r.status === 401) {
+      onExpired(`your answer to question ${num} was not saved`)
+    } else if (r.uncertain) {
+      setWarn({ kind: "error", message: `We couldn't confirm whether your answer to question ${num} was saved. Reopen the paper to check.` })
+    } else {
+      setWarn({ kind: "error", message: `Your answer to question ${num} was not saved: ${r.error.message}` })
+    }
+  }
+
+  async function finish() {
+    const r = await send<{ stats: Stats }>("POST", `${base}/finish`)
+    if (r.status === 401) return onExpired("the practice could not be finished")
+    if (!r.ok) return setWarn({ kind: "error", message: r.error.message })
+    const { stats } = r.data
+    setPaper((p) => p && { ...p, stats })
+    setFinished(true)
+  }
+
+  return (
+    <>
+      <h1 className="text-2xl font-semibold tracking-tight">{paper.title}</h1>
+      {paper.description && <p className="text-muted-foreground">{paper.description}</p>}
+      <div className="grid gap-1.5">
+        <Progress value={stats.total ? (stats.answered / stats.total) * 100 : 0} aria-label="Progress" />
+        <p className="text-sm text-muted-foreground">
+          Answered {stats.answered} / {stats.total} · {stats.correct} correct · {stats.incorrect} incorrect
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {questions.map((x, i) => (
+          <Button
+            key={x.id}
+            variant="outline"
+            size="icon-sm"
+            className={cn(x.answer && (x.answer.is_correct ? OK : BAD), i === index && "ring-2 ring-ring")}
+            aria-label={`Question ${i + 1}${x.answer ? (x.answer.is_correct ? ", correct" : ", incorrect") : ", unanswered"}`}
+            aria-current={i === index ? "step" : undefined}
+            onClick={() => go(i)}
+          >
+            {i + 1}
+          </Button>
+        ))}
+      </div>
+      {warn && <Notice kind={warn.kind} message={warn.message} />}
+      <Card>
+        {finished ? (
+          <CardContent className="grid gap-4">
+            <h2 className="text-lg font-semibold">Practice complete</h2>
+            <div className="grid grid-cols-3 gap-3 text-center text-sm text-muted-foreground">
+              <div>
+                <strong className={cn("block text-3xl", OK)}>{stats.correct}</strong>Correct
+              </div>
+              <div>
+                <strong className={cn("block text-3xl", BAD)}>{stats.incorrect}</strong>Incorrect
+              </div>
+              <div>
+                <strong className="block text-3xl text-foreground">{stats.unanswered}</strong>Unanswered
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">Your answers are saved. You can come back and change them anytime.</p>
+            <div className="flex justify-between">
+              <Button variant="ghost" onClick={() => setFinished(false)}>
+                Back to edit
+              </Button>
+              <Button onClick={onHome}>Done</Button>
+            </div>
+          </CardContent>
+        ) : (
+          <CardContent className="grid gap-4">
+            <div className="flex items-center justify-between">
+              <Badge variant="secondary">{KIND_LABEL[q.kind]}</Badge>
+              <span className="text-sm text-muted-foreground">
+                Question {index + 1} of {questions.length}
+              </span>
+            </div>
+            <p className="text-lg whitespace-pre-wrap">{q.prompt}</p>
+            {q.kind === "choice" ? (
+              <div className="grid gap-2">
+                {q.options?.map((o, i) => {
+                  const chosen = q.answer?.saved_answer === o.id
+                  return (
+                    <Button
+                      key={o.id}
+                      variant="outline"
+                      className={cn(
+                        "h-auto justify-start py-2 text-left font-normal whitespace-normal",
+                        chosen && (q.answer?.is_correct ? OK : BAD)
+                      )}
+                      aria-pressed={chosen}
+                      disabled={busy}
+                      onClick={() => submit(q, { option_id: o.id })}
+                    >
+                      <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs text-foreground">
+                        {String.fromCharCode(65 + i)}
+                      </span>
+                      {o.text}
+                    </Button>
+                  )
+                })}
+              </div>
+            ) : (
+              <TextAnswer
+                key={q.id}
+                saved={q.answer?.saved_answer}
+                value={drafts.get(q.id) ?? q.answer?.saved_answer ?? ""}
+                busy={busy}
+                onDraft={(text) => setDrafts((previous) => new Map(previous).set(q.id, text))}
+                onEmpty={() => setWarn({ kind: "warn", message: "Please enter an answer first." })}
+                onSubmit={(text) => submit(q, { text })}
+              />
+            )}
+            {q.answer && <Feedback q={q} a={q.answer} />}
+            <div className="flex justify-between">
+              <Button variant="ghost" disabled={index === 0} onClick={() => go(index - 1)}>
+                <ArrowLeft /> Previous
+              </Button>
+              {last ? (
+                <Button onClick={finish}>Finish</Button>
+              ) : (
+                <Button variant="ghost" onClick={() => go(index + 1)}>
+                  Next <ArrowRight />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    </>
+  )
+}
+
+function TextAnswer(props: {
+  saved?: string
+  value: string
+  busy: boolean
+  onDraft: (text: string) => void
+  onEmpty: () => void
+  onSubmit: (text: string) => void
+}) {
+  const { saved, value, busy, onDraft, onEmpty, onSubmit } = props
+  const submit = () => (value.trim() ? onSubmit(value) : onEmpty())
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-end gap-2">
+        <Textarea
+          aria-label="Your answer"
+          placeholder="Type your answer, Enter to submit (Shift+Enter for a new line)"
+          rows={2}
+          maxLength={2000}
+          disabled={busy}
+          value={value}
+          onChange={(e) => onDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // isComposing: Enter that confirms an IME candidate (e.g. pinyin) must not submit.
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault()
+              submit()
+            }
+          }}
+        />
+        <Button size="icon" aria-label="Submit answer" title="Submit" disabled={busy} onClick={submit}>
+          <ArrowUp />
+        </Button>
+      </div>
+      {saved !== undefined && value !== saved && (
+        <p className="text-sm text-muted-foreground">You have unsubmitted changes; they won't be saved if you leave</p>
+      )}
+    </div>
+  )
+}
+
+function Feedback({ q, a }: { q: Question; a: Answer }) {
+  const rows = [
+    ...(q.kind === "choice" ? [] : [["Your answer", a.saved_answer]]),
+    ["Reference answer", a.correct_answer],
+    ["Explanation", a.explanation],
+  ]
+  return (
+    <div className={cn("grid gap-2 rounded-lg border p-4 text-sm", a.is_correct ? OK : BAD)}>
+      <div className="flex items-center gap-1.5 font-medium">
+        {a.is_correct ? <Check className="size-4" /> : <X className="size-4" />}
+        {a.is_correct ? "Correct" : "Incorrect"}
+      </div>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-foreground">
+        {rows.map(([label, text]) => (
+          <div key={label} className="contents">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="whitespace-pre-wrap">{text}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}

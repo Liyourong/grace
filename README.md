@@ -39,6 +39,13 @@ refactor(api): simplify request validation
 
 ## CI and deployment
 
+On the `ci/cd-v5` rehearsal branch, deployment is triggered only by the
+`cd-test-v5` tag and uses the `ci-cd-pipeline` environment. It publishes the
+tested image as both `v5` and the commit SHA, verifies the public app and
+runs the business smoke tests. The release script requires the live v4 baseline
+before applying; a failed V5 acceptance switches the app back to the verified
+v4 digest. The routine dev flow below describes the pipeline in PR #26.
+
 A PR to `dev` runs the `verify` check on an isolated Linux runner. It runs Rust tests,
 frontend checks, an offline render of the DOKS configuration, and the HTTP smoke tests
 against the production image and a temporary PostgreSQL 17 database. For the static frontend,

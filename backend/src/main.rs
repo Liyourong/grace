@@ -121,7 +121,7 @@ async fn require_origin(State(s): State<AppState>, req: Request, next: Next) -> 
     if !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) {
         let origin = req.headers().get(ORIGIN).and_then(|v| v.to_str().ok());
         if !origin.is_some_and(|o| s.origins.iter().any(|a| a == o)) {
-            return AppError::new(StatusCode::FORBIDDEN, "origin_not_allowed", "请求来源不被允许").into_response();
+            return AppError::new(StatusCode::FORBIDDEN, "origin_not_allowed", "Request origin not allowed").into_response();
         }
     }
     next.run(req).await
