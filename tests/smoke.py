@@ -69,6 +69,106 @@ def wait_ready(client: Client) -> None:
         time.sleep(1)
     raise RuntimeError(f"Service at {client.base_url} did not become ready in 30s")
 
+def check_practice_grading(client: Client, paper_id: str) -> None:
+    """Issue #18: exercise grading, resubmission, errors, and persistence."""
+    base = f"/api/papers/{paper_id}"
+
+    def submit(qid: str, body: dict) -> tuple[int, dict | None]:
+        return client.request("PUT", f"{base}/answers/{qid}", body)
+
+    def expect_stats(stats: dict, answered: int, correct: int, incorrect: int) -> None:
+        assert stats == {
+            "total": 3,
+            "answered": answered,
+            "correct": correct,
+            "incorrect": incorrect,
+            "unanswered": 3 - answered,
+        }, stats
+
+    # This is a newly uploaded, previously unanswered French sample paper.
+    status, detail = client.request("GET", base)
+    assert status == 200, (status, detail)
+    expect_stats(detail["stats"], 0, 0, 0)
+
+    # A listed but wrong choice is valid: it must be saved and counted as wrong.
+    status, res = submit("q1", {"option_id": "b"})
+    assert status == 200, (status, res)
+    assert res["answer"]["saved_answer"] == "b", res
+    assert res["answer"]["is_correct"] is False, res
+    assert res["answer"]["correct_answer"] == "Bonjour", res
+    assert res["answer"]["explanation"], res
+    expect_stats(res["stats"], 1, 0, 1)
+
+    # Correct the SAME question: it stays answered once, and stats change.
+    status, res = submit("q1", {"option_id": "a"})
+    assert status == 200 and res["answer"]["is_correct"] is True, (status, res)
+    expect_stats(res["stats"], 1, 1, 0)
+
+    # Set a different position, then ensure an invalid submission changes neither.
+    status, body = client.request("PUT", f"{base}/position", {"question_id": "q3"})
+    assert status == 204 and body is None, (status, body)
+    status, err = submit("q1", {"option_id": "z"})
+    assert status == 400 and err["error"] == {
+        "code": "invalid_answer", "message": "该选项不属于本题"
+    }, (status, err)
+    status, err = submit("q1", {"text": "Bonjour"})
+    assert status == 400 and err["error"]["message"] == "选择题需要提交 option_id", (status, err)
+    status, err = submit("bad!", {"option_id": "a"})
+    assert status == 404 and err["error"]["code"] == "not_found", (status, err)
+    status, err = client.request("PUT", f"{base}/position", {"question_id": "bad!"})
+    assert status == 404 and err["error"]["code"] == "not_found", (status, err)
+    status, detail = client.request("GET", base)
+    assert status == 200 and detail["current_question_id"] == "q3", (status, detail)
+    q1 = next(q for q in detail["questions"] if q["id"] == "q1")
+    assert q1["answer"]["saved_answer"] == "a" and q1["answer"]["is_correct"] is True, q1
+    expect_stats(detail["stats"], 1, 1, 0)
+
+    # A wrong translation must still return its reference answer and feedback.
+    status, res = submit("q2", {"text": "Bonsoir"})
+    assert status == 200 and res["answer"]["is_correct"] is False, (status, res)
+    assert res["answer"]["correct_answer"] == "Merci.", res
+    assert res["answer"]["explanation"], res
+    expect_stats(res["stats"], 2, 1, 1)
+
+    # Normalized text matches, but the ORIGINAL submission is retained.
+    original = "  merci!! "
+    status, res = submit("q2", {"text": original})
+    assert status == 200 and res["answer"]["is_correct"] is True, (status, res)
+    assert res["answer"]["saved_answer"] == original, res
+    expect_stats(res["stats"], 2, 2, 0)
+
+    # Rejected text must not overwrite the previous valid answer or progress.
+    invalid_texts = [
+        ({}, "需要提交 text"),
+        ({"text": "?! ..."}, "答案不能为空"),
+        ({"text": "x" * 2001}, "答案不能超过 2000 个字符，也不能包含 NUL 字符"),
+        ({"text": "a\0b"}, "答案不能超过 2000 个字符，也不能包含 NUL 字符"),
+    ]
+    for payload, message in invalid_texts:
+        status, err = submit("q2", payload)
+        assert status == 400 and err["error"] == {
+            "code": "invalid_answer", "message": message
+        }, (payload, status, err)
+    status, detail = client.request("GET", base)
+    q2 = next(q for q in detail["questions"] if q["id"] == "q2")
+    assert status == 200 and q2["answer"]["saved_answer"] == original, (status, detail)
+    assert q2["answer"]["is_correct"] is True, q2
+    assert detail["current_question_id"] == "q2", detail
+    expect_stats(detail["stats"], 2, 2, 0)
+
+    # Sentence questions use the same normalization-based text grading.
+    status, res = submit("q3", {"text": "J'aime le français."})
+    assert status == 200 and res["answer"]["is_correct"] is True, (status, res)
+    expect_stats(res["stats"], 3, 3, 0)
+
+    # Finishing reports final stats without locking or erasing the paper.
+    status, res = client.request("POST", f"{base}/finish")
+    assert status == 200, (status, res)
+    expect_stats(res["stats"], 3, 3, 0)
+    status, detail = client.request("GET", base)
+    assert status == 200, (status, detail)
+    expect_stats(detail["stats"], 3, 3, 0)
+    print("Practice grading smoke checks passed!")
 
 def main() -> None:
     suffix = str(int(time.time() * 1000))
@@ -157,8 +257,8 @@ def main() -> None:
     for q in detail_after["questions"]:
         assert "correct_option_id" not in q
         assert "accepted_answers" not in q
-
-    print("All papers smoke checks passed!")
+    check_practice_grading(user_a, pid2)
+    print("All papers and practice smoke checks passed!")
 
 
 if __name__ == "__main__":

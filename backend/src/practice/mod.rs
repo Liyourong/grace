@@ -42,7 +42,18 @@ async fn save_answer(
     let paper_id = parse_id(&paper_id)?;
     let mut db = s.pool.get().await?;
     let q = find_question(&db, paper_id, user.id, &question_id).await?;
-    let (saved, is_correct) = rules::grade(submission);
+    let key = if q.kind.as_str() == "choice" {
+        let option_ids = q.options.as_ref()
+            .map(|options| options.iter().map(|o| o.id.as_str()).collect())
+            .unwrap_or_default();
+        rules::GradingKey::Choice {
+            option_ids,
+            correct_option_id: q.correct_option_id.as_deref(),
+        }
+    } else {
+        rules::GradingKey::Text { accepted_answers: &q.accepted_answers }
+    };
+    let (saved, is_correct) = rules::grade(submission, key)?;
     let updated_at = store::save_answer(&mut db, user.id, paper_id, q.id, &saved, is_correct).await?;
     Ok(Json(json!({
         "answer": {
@@ -85,7 +96,7 @@ async fn finish(State(s): State<AppState>, user: CurrentUser, Path(paper_id): Pa
 
 /// The question, if it is in a paper this user owns; otherwise 404.
 async fn find_question(db: &Object, paper_id: i64, user_id: i64, question_id: &str) -> Result<QuestionRow> {
-    if question_id.contains('\0') {
+    if !papers::valid_id(question_id) {
         return Err(AppError::not_found());
     }
     papers::find_question(db, paper_id, user_id, question_id).await?.ok_or_else(AppError::not_found)
