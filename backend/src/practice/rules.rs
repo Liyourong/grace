@@ -73,22 +73,22 @@ pub fn grade(submission: Submission, key: GradingKey<'_>) -> Result<(String, boo
     match key {
         GradingKey::Choice { option_ids, correct_option_id } => {
             let selected = submission.option_id
-                .ok_or_else(|| invalid("选择题需要提交 option_id"))?;
+                .ok_or_else(|| invalid("Choice questions require option_id"))?;
             if !option_ids.iter().any(|id| *id == selected.as_str()) {
-                return Err(invalid("该选项不属于本题"));
+                return Err(invalid("That option does not belong to this question"));
             }
             let is_correct = Some(selected.as_str()) == correct_option_id;
             Ok((selected, is_correct))
         }
         GradingKey::Text { accepted_answers } => {
             let original = submission.text
-                .ok_or_else(|| invalid("需要提交 text"))?;
+                .ok_or_else(|| invalid("text is required"))?;
             if original.contains('\0') || original.chars().count() > 2_000 {
-                return Err(invalid("答案不能超过 2000 个字符，也不能包含 NUL 字符"));
+                return Err(invalid("The answer must be at most 2000 characters and must not contain NUL characters"));
             }
             let normalized = normalize(&original);
             if normalized.is_empty() {
-                return Err(invalid("答案不能为空"));
+                return Err(invalid("The answer must not be empty"));
             }
             let is_correct = accepted_answers.iter().any(|answer| normalize(answer) == normalized);
             Ok((original, is_correct))

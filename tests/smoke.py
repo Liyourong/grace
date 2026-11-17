@@ -109,10 +109,10 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     assert status == 204 and body is None, (status, body)
     status, err = submit("q1", {"option_id": "z"})
     assert status == 400 and err["error"] == {
-        "code": "invalid_answer", "message": "该选项不属于本题"
+        "code": "invalid_answer", "message": "That option does not belong to this question"
     }, (status, err)
     status, err = submit("q1", {"text": "Bonjour"})
-    assert status == 400 and err["error"]["message"] == "选择题需要提交 option_id", (status, err)
+    assert status == 400 and err["error"]["message"] == "Choice questions require option_id", (status, err)
     status, err = submit("bad!", {"option_id": "a"})
     assert status == 404 and err["error"]["code"] == "not_found", (status, err)
     status, err = client.request("PUT", f"{base}/position", {"question_id": "bad!"})
@@ -139,10 +139,10 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
 
     # Rejected text must not overwrite the previous valid answer or progress.
     invalid_texts = [
-        ({}, "需要提交 text"),
-        ({"text": "?! ..."}, "答案不能为空"),
-        ({"text": "x" * 2001}, "答案不能超过 2000 个字符，也不能包含 NUL 字符"),
-        ({"text": "a\0b"}, "答案不能超过 2000 个字符，也不能包含 NUL 字符"),
+        ({}, "text is required"),
+        ({"text": "?! ..."}, "The answer must not be empty"),
+        ({"text": "x" * 2001}, "The answer must be at most 2000 characters and must not contain NUL characters"),
+        ({"text": "a\0b"}, "The answer must be at most 2000 characters and must not contain NUL characters"),
     ]
     for payload, message in invalid_texts:
         status, err = submit("q2", payload)
@@ -194,7 +194,7 @@ def main() -> None:
     status, err = user_a.request("POST", "/api/papers", invalid_paper)
     assert status == 400, f"expected 400 for invalid-paper.json, got {status}: {err}"
     assert err["error"]["code"] == "invalid_paper_file", err
-    assert err["error"]["message"] == "试卷文件格式不正确", err
+    assert err["error"]["message"] == "The paper file is not valid", err
     assert len(err["error"].get("details", [])) >= 3, f"expected >= 3 details, got {err}"
 
     # 2. NUL input returns 400.

@@ -36,20 +36,20 @@ impl AppError {
         Self::new(StatusCode::BAD_REQUEST, code, message)
     }
     pub fn unauthorized() -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "unauthorized", "请先登录")
+        Self::new(StatusCode::UNAUTHORIZED, "unauthorized", "Please sign in first")
     }
     pub fn not_found() -> Self {
-        Self::new(StatusCode::NOT_FOUND, "not_found", "找不到该试卷或题目")
+        Self::new(StatusCode::NOT_FOUND, "not_found", "Paper or question not found")
     }
     pub fn internal() -> Self {
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", "服务器内部错误")
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", "Internal server error")
     }
     /// At most 20 details are listed; the rest are summarized in one line.
     pub fn with_details(mut self, mut details: Vec<String>) -> Self {
         if details.len() > 20 {
             let rest = details.len() - 20;
             details.truncate(20);
-            details.push(format!("另有 {rest} 条错误未列出"));
+            details.push(format!("{rest} more errors not listed"));
         }
         self.details = details;
         self
@@ -69,7 +69,7 @@ impl IntoResponse for AppError {
 impl From<deadpool_postgres::PoolError> for AppError {
     fn from(e: deadpool_postgres::PoolError) -> Self {
         eprintln!("database pool error: {e}");
-        Self::new(StatusCode::SERVICE_UNAVAILABLE, "db_unavailable", "数据库暂时不可用")
+        Self::new(StatusCode::SERVICE_UNAVAILABLE, "db_unavailable", "The database is temporarily unavailable")
     }
 }
 
@@ -77,7 +77,7 @@ impl From<tokio_postgres::Error> for AppError {
     fn from(e: tokio_postgres::Error) -> Self {
         eprintln!("database error: {e}");
         if e.is_closed() {
-            Self::new(StatusCode::SERVICE_UNAVAILABLE, "db_unavailable", "数据库暂时不可用")
+            Self::new(StatusCode::SERVICE_UNAVAILABLE, "db_unavailable", "The database is temporarily unavailable")
         } else {
             Self::internal()
         }
@@ -102,14 +102,14 @@ impl<T: DeserializeOwned, S: Send + Sync> FromRequest<S> for Body<T> {
             Ok(Json(v)) => Ok(Body(v)),
             Err(e) => Err(match e.status() {
                 StatusCode::PAYLOAD_TOO_LARGE => {
-                    AppError::new(StatusCode::PAYLOAD_TOO_LARGE, "file_too_large", "请求内容超过 1 MiB 上限")
+                    AppError::new(StatusCode::PAYLOAD_TOO_LARGE, "file_too_large", "The request body exceeds the 1 MiB limit")
                 }
                 StatusCode::UNSUPPORTED_MEDIA_TYPE => AppError::new(
                     StatusCode::UNSUPPORTED_MEDIA_TYPE,
                     "unsupported_media_type",
-                    "请求必须使用 Content-Type: application/json",
+                    "Requests must use Content-Type: application/json",
                 ),
-                _ => AppError::bad_request("invalid_json", "请求内容不是有效的 JSON").with_details(vec![e.body_text()]),
+                _ => AppError::bad_request("invalid_json", "The request body is not valid JSON").with_details(vec![e.body_text()]),
             }),
         }
     }

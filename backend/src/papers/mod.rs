@@ -34,7 +34,7 @@ pub fn router() -> Router<AppState> {
 
 async fn upload(State(s): State<AppState>, user: CurrentUser, Body(file): Body<Value>) -> Result<(StatusCode, Json<Value>)> {
     let paper = rules::parse(&file)
-        .map_err(|details| AppError::bad_request("invalid_paper_file", "试卷文件格式不正确").with_details(details))?;
+        .map_err(|details| AppError::bad_request("invalid_paper_file", "The paper file is not valid").with_details(details))?;
     let id = store::insert(&mut s.pool.get().await?, user.id, &paper).await?;
     eprintln!("paper {id} uploaded by user {} ({} questions)", user.id, paper.questions.len());
     Ok((
