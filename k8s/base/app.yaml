@@ -23,6 +23,17 @@ spec:
               valueFrom: { secretKeyRef: { name: grace-db, key: password } }
             # The secret is hex, so it is safe inside a URL without escaping.
             - { name: DATABASE_URL, value: "postgres://grace:$(POSTGRES_PASSWORD)@db:5432/grace" }
+            # Email verification. Secret `grace-sendgrid` is created by hand and never committed (see README).
+            # optional: the pod still starts without it, but registration then answers 503 until it exists.
+            # Env vars from a Secret are read at container start: roll the Deployment after changing it.
+            - name: SENDGRID_API_KEY
+              valueFrom: { secretKeyRef: { name: grace-sendgrid, key: SENDGRID_API_KEY, optional: true } }
+            - name: SENDGRID_FROM_EMAIL
+              valueFrom: { secretKeyRef: { name: grace-sendgrid, key: SENDGRID_FROM_EMAIL, optional: true } }
+            - name: DEMO_EMAIL
+              valueFrom: { secretKeyRef: { name: grace-sendgrid, key: DEMO_EMAIL, optional: true } }
+            - name: DEMO_CODE
+              valueFrom: { secretKeyRef: { name: grace-sendgrid, key: DEMO_CODE, optional: true } }
           ports:
             - containerPort: 8080
           # Keep serving while the pod is removed from Service endpoints, so rolling updates do not 502.

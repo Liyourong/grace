@@ -2,17 +2,26 @@
 """Papers-focused HTTP smoke tests for Grace (Issue #17).
 
 Usage:
-    python3 tests/smoke.py [BASE_URL]
+    SMOKE_PSQL='docker compose exec -T db psql -U grace -d grace -v ON_ERROR_STOP=1 -q' \\
+        python3 tests/smoke.py [BASE_URL]
 
 Defaults to GRACE_URL env var or http://localhost:8090.
+
+Registration needs a code emailed to a real address (Issue #29), which a smoke test cannot read, so email
+verification is tested manually. The test accounts are instead created directly in the database through the
+`psql` command in SMOKE_PSQL (it must read SQL from stdin), signed in with sessions created there, and deleted
+at the end (their papers and answers go with them).
 """
 
 from __future__ import annotations
 
+import hashlib
 import http.cookiejar
 import json
 import os
 import secrets
+import shlex
+import subprocess
 import sys
 import time
 import urllib.error
@@ -24,8 +33,9 @@ BASE_URL = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("GRACE_URL", "h
 
 
 class Client:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, session: str | None = None) -> None:
         self.base_url = base_url
+        self.session = session
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
         )
@@ -33,6 +43,8 @@ class Client:
     def request(self, method: str, path: str, body: object | None = None) -> tuple[int, dict | None]:
         data = None
         headers: dict[str, str] = {}
+        if self.session:
+            headers["Cookie"] = f"session={self.session}"
         if method not in ("GET", "HEAD", "OPTIONS"):
             headers["Origin"] = self.base_url
         if body is not None:
@@ -69,6 +81,27 @@ def wait_ready(client: Client) -> None:
             pass
         time.sleep(1)
     raise RuntimeError(f"Service at {client.base_url} did not become ready in 30s")
+
+def run_sql(sql: str) -> None:
+    command = os.environ.get("SMOKE_PSQL")
+    if not command:
+        raise RuntimeError("Set SMOKE_PSQL to a psql command for the app's database (see the top of this file)")
+    result = subprocess.run(shlex.split(command), input=sql, text=True, capture_output=True, timeout=60)
+    if result.returncode != 0:
+        raise RuntimeError(f"SMOKE_PSQL failed: {result.stderr.strip()}")
+
+
+def seed_sessions(username: str, count: int) -> list[str]:
+    """Creates a user and `count` open sessions for it directly in the database; returns the session tokens."""
+    tokens = [secrets.token_hex(32) for _ in range(count)]
+    hashes = ", ".join(f"('{hashlib.sha256(t.encode()).hexdigest()}')" for t in tokens)  # the app stores SHA-256 only
+    run_sql(
+        f"""WITH u AS (INSERT INTO users (username, password_hash) VALUES ('{username}', '') RETURNING id)
+            INSERT INTO sessions (token_hash, user_id, expires_at)
+            SELECT h, u.id, now() + interval '1 hour' FROM u, (VALUES {hashes}) AS t(h);"""
+    )
+    return tokens
+
 
 def check_practice_grading(client: Client, paper_id: str) -> None:
     """Issue #18: exercise grading, resubmission, errors, and persistence."""
@@ -173,19 +206,18 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
 
 def main() -> None:
     suffix = secrets.token_hex(8)
-    credentials_a = {"username": f"smoke_a_{suffix}", "password": secrets.token_urlsafe(24)}
-    credentials_b = {"username": f"smoke_b_{suffix}", "password": secrets.token_urlsafe(24)}
-    user_a = Client(BASE_URL)
-    user_b = Client(BASE_URL)
+    name_a, name_b = f"smoke_a_{suffix}", f"smoke_b_{suffix}"
+    wait_ready(Client(BASE_URL))
+    # Two distinct signed-in users; user A gets a second session to resume from later.
+    tokens_a = seed_sessions(name_a, 2)
+    tokens_b = seed_sessions(name_b, 1)
+    try:
+        run_checks(Client(BASE_URL, tokens_a[0]), Client(BASE_URL, tokens_b[0]), tokens_a[1])
+    finally:
+        run_sql(f"DELETE FROM users WHERE username IN ('{name_a}', '{name_b}');")
 
-    wait_ready(user_a)
 
-    # Sign in two distinct users.
-    status, data = user_a.request("POST", "/api/auth/register", credentials_a)
-    assert status in (200, 201), f"user A register failed: {status} {data}"
-    status, data = user_b.request("POST", "/api/auth/register", credentials_b)
-    assert status in (200, 201), f"user B register failed: {status} {data}"
-
+def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
     # Default paper is provisioned once on first list.
     status, list_a = user_a.request("GET", "/api/papers")
     assert status == 200 and len(list_a["papers"]) == 1, f"expected 1 default paper: {status} {list_a}"
@@ -268,15 +300,15 @@ def main() -> None:
     assert status == 204, status
     status, _ = user_a.request("GET", f"/api/papers/{pid1}")
     assert status == 401, status
-    fresh = Client(BASE_URL)
-    status, _ = fresh.request("POST", "/api/auth/login", credentials_a)
-    assert status == 200, status
+    fresh = Client(BASE_URL, resume_session)  # another session of the same user, as after signing in again
+    status, me = fresh.request("GET", "/api/auth/me")
+    assert status == 200 and me["user"]["username"].startswith("smoke_a_"), (status, me)
     status, restored = fresh.request("GET", f"/api/papers/{pid1}")
     assert status == 200, status
     assert restored["current_question_id"] == "q3", restored
     assert restored["stats"] == detail_after["stats"], restored
     assert restored["questions"] == detail_after["questions"], restored
-    print("All papers, grading, and sign-in recovery checks passed!")
+    print("All papers, grading, and session-resume checks passed!")
 
 
 if __name__ == "__main__":

@@ -51,6 +51,7 @@ jobs:
       - name: Build and test the release image with PostgreSQL 17
         env:
           DOCKER_DEFAULT_PLATFORM: linux/amd64
+          SMOKE_PSQL: docker compose exec -T db psql -U grace -d grace -v ON_ERROR_STOP=1 -q
         run: |
           docker compose up --build -d --wait --wait-timeout 120
           python3 tests/smoke.py http://localhost:8090
