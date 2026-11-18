@@ -1,0 +1,1758 @@
+{
+  "rate": 15,
+  "seconds": 150,
+  "accounts": 10,
+  "context": "grace-dash-demo",
+  "fixed": {
+    "planned": 2250,
+    "missed": 0,
+    "overall": {
+      "started": 2250,
+      "failed": 0,
+      "calls": 15750,
+      "errors": {},
+      "workflow_ms": {
+        "p50": 31.19,
+        "p95": 35.15,
+        "p99": 37.35
+      },
+      "practice_ms": {
+        "p50": 13.45,
+        "p95": 16.3,
+        "p99": 17.62
+      },
+      "answer_ms": {
+        "p50": 3.14,
+        "p95": 4.21,
+        "p99": 4.77
+      }
+    },
+    "last_minute": {
+      "started": 900,
+      "failed": 0,
+      "calls": 6300,
+      "errors": {},
+      "workflow_ms": {
+        "p50": 31.12,
+        "p95": 34.92,
+        "p99": 36.7
+      },
+      "practice_ms": {
+        "p50": 13.45,
+        "p95": 16.24,
+        "p99": 17.4
+      },
+      "answer_ms": {
+        "p50": 3.12,
+        "p95": 4.19,
+        "p99": 4.6
+      }
+    },
+    "bins": [
+      {
+        "t": 0,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.41,
+          "p95": 35.31,
+          "p99": 38.31
+        },
+        "practice_ms": {
+          "p50": 13.7,
+          "p95": 16.29,
+          "p99": 17.52
+        },
+        "answer_ms": {
+          "p50": 3.15,
+          "p95": 4.54,
+          "p99": 5.97
+        }
+      },
+      {
+        "t": 10,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.37,
+          "p95": 34.93,
+          "p99": 38.11
+        },
+        "practice_ms": {
+          "p50": 13.43,
+          "p95": 16.13,
+          "p99": 16.58
+        },
+        "answer_ms": {
+          "p50": 3.18,
+          "p95": 4.33,
+          "p99": 4.7
+        }
+      },
+      {
+        "t": 20,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 30.98,
+          "p95": 33.94,
+          "p99": 35.97
+        },
+        "practice_ms": {
+          "p50": 13.16,
+          "p95": 16.03,
+          "p99": 17.6
+        },
+        "answer_ms": {
+          "p50": 3.07,
+          "p95": 4.05,
+          "p99": 4.31
+        }
+      },
+      {
+        "t": 30,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.01,
+          "p95": 35.53,
+          "p99": 39.31
+        },
+        "practice_ms": {
+          "p50": 13.5,
+          "p95": 16.99,
+          "p99": 19.12
+        },
+        "answer_ms": {
+          "p50": 3.17,
+          "p95": 4.41,
+          "p99": 4.77
+        }
+      },
+      {
+        "t": 40,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 30.59,
+          "p95": 34.43,
+          "p99": 35.56
+        },
+        "practice_ms": {
+          "p50": 12.88,
+          "p95": 15.89,
+          "p99": 16.82
+        },
+        "answer_ms": {
+          "p50": 2.9,
+          "p95": 3.98,
+          "p99": 4.53
+        }
+      },
+      {
+        "t": 50,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.51,
+          "p95": 36.07,
+          "p99": 39.18
+        },
+        "practice_ms": {
+          "p50": 13.6,
+          "p95": 16.77,
+          "p99": 18.9
+        },
+        "answer_ms": {
+          "p50": 3.19,
+          "p95": 4.18,
+          "p99": 4.53
+        }
+      },
+      {
+        "t": 60,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.4,
+          "p95": 35.67,
+          "p99": 38.96
+        },
+        "practice_ms": {
+          "p50": 13.57,
+          "p95": 16.04,
+          "p99": 17.47
+        },
+        "answer_ms": {
+          "p50": 3.2,
+          "p95": 4.29,
+          "p99": 5.07
+        }
+      },
+      {
+        "t": 70,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.63,
+          "p95": 35.43,
+          "p99": 37.35
+        },
+        "practice_ms": {
+          "p50": 13.4,
+          "p95": 16.38,
+          "p99": 17.72
+        },
+        "answer_ms": {
+          "p50": 3.13,
+          "p95": 4.32,
+          "p99": 4.73
+        }
+      },
+      {
+        "t": 80,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.39,
+          "p95": 35.28,
+          "p99": 36.17
+        },
+        "practice_ms": {
+          "p50": 13.58,
+          "p95": 16.11,
+          "p99": 17.1
+        },
+        "answer_ms": {
+          "p50": 3.16,
+          "p95": 4.19,
+          "p99": 4.69
+        }
+      },
+      {
+        "t": 90,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 30.39,
+          "p95": 34.5,
+          "p99": 35.67
+        },
+        "practice_ms": {
+          "p50": 12.8,
+          "p95": 16.12,
+          "p99": 16.9
+        },
+        "answer_ms": {
+          "p50": 2.92,
+          "p95": 4.1,
+          "p99": 4.42
+        }
+      },
+      {
+        "t": 100,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.17,
+          "p95": 34.83,
+          "p99": 37.7
+        },
+        "practice_ms": {
+          "p50": 13.51,
+          "p95": 15.99,
+          "p99": 17.0
+        },
+        "answer_ms": {
+          "p50": 3.09,
+          "p95": 4.23,
+          "p99": 4.37
+        }
+      },
+      {
+        "t": 110,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.19,
+          "p95": 35.48,
+          "p99": 36.61
+        },
+        "practice_ms": {
+          "p50": 13.57,
+          "p95": 16.24,
+          "p99": 17.94
+        },
+        "answer_ms": {
+          "p50": 3.15,
+          "p95": 4.4,
+          "p99": 4.59
+        }
+      },
+      {
+        "t": 120,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.5,
+          "p95": 35.17,
+          "p99": 37.49
+        },
+        "practice_ms": {
+          "p50": 13.71,
+          "p95": 16.03,
+          "p99": 18.09
+        },
+        "answer_ms": {
+          "p50": 3.21,
+          "p95": 4.1,
+          "p99": 5.14
+        }
+      },
+      {
+        "t": 130,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.42,
+          "p95": 35.18,
+          "p99": 36.34
+        },
+        "practice_ms": {
+          "p50": 13.56,
+          "p95": 16.34,
+          "p99": 16.93
+        },
+        "answer_ms": {
+          "p50": 3.2,
+          "p95": 4.23,
+          "p99": 4.94
+        }
+      },
+      {
+        "t": 140,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.1,
+          "p95": 34.66,
+          "p99": 36.59
+        },
+        "practice_ms": {
+          "p50": 13.46,
+          "p95": 16.37,
+          "p99": 18.44
+        },
+        "answer_ms": {
+          "p50": 3.15,
+          "p95": 4.11,
+          "p99": 4.4
+        }
+      }
+    ],
+    "samples": [
+      {
+        "t": 0,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 2,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 12288,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 5,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 2,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 14625,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 10,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 2,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 17378,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 15,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 2,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 19431,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 20,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 22040,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 25,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 24437,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 30,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 26812,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 35,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 6.28,
+        "db_cpu_at": "2026-11-18T07:11:38Z",
+        "db_cpu_window": "1m2.802s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 29362,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 40,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 31671,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 45,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 34043,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 50,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 36485,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 55,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 38924,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 60,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 41171,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 65,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 43740,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 70,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 46085,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 75,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 48534,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 80,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 50804,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 85,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 53336,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 90,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 55647,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 95,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 44.24,
+        "db_cpu_at": "2026-11-18T07:12:33Z",
+        "db_cpu_window": "54.939s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 58045,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 100,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 60597,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 105,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 62889,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 110,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 65381,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 115,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 67594,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 120,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 70321,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 125,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 72664,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 130,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 74945,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 135,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 77512,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 140,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 79693,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 145,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 82155,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 150,
+        "available": 2,
+        "desired": 2,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 3,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 84542,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      }
+    ]
+  },
+  "hpa": {
+    "planned": 2250,
+    "missed": 0,
+    "overall": {
+      "started": 2250,
+      "failed": 0,
+      "calls": 15750,
+      "errors": {},
+      "workflow_ms": {
+        "p50": 31.16,
+        "p95": 35.0,
+        "p99": 37.12
+      },
+      "practice_ms": {
+        "p50": 13.09,
+        "p95": 15.99,
+        "p99": 17.83
+      },
+      "answer_ms": {
+        "p50": 3.12,
+        "p95": 4.17,
+        "p99": 4.93
+      }
+    },
+    "last_minute": {
+      "started": 900,
+      "failed": 0,
+      "calls": 6300,
+      "errors": {},
+      "workflow_ms": {
+        "p50": 31.14,
+        "p95": 34.81,
+        "p99": 36.56
+      },
+      "practice_ms": {
+        "p50": 13.13,
+        "p95": 15.99,
+        "p99": 17.61
+      },
+      "answer_ms": {
+        "p50": 3.1,
+        "p95": 4.2,
+        "p99": 4.92
+      }
+    },
+    "bins": [
+      {
+        "t": 0,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 30.77,
+          "p95": 35.5,
+          "p99": 37.59
+        },
+        "practice_ms": {
+          "p50": 12.68,
+          "p95": 16.47,
+          "p99": 18.84
+        },
+        "answer_ms": {
+          "p50": 3.08,
+          "p95": 4.36,
+          "p99": 5.18
+        }
+      },
+      {
+        "t": 10,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 30.27,
+          "p95": 35.53,
+          "p99": 38.9
+        },
+        "practice_ms": {
+          "p50": 12.45,
+          "p95": 15.71,
+          "p99": 18.21
+        },
+        "answer_ms": {
+          "p50": 2.93,
+          "p95": 4.0,
+          "p99": 4.35
+        }
+      },
+      {
+        "t": 20,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.23,
+          "p95": 34.52,
+          "p99": 44.61
+        },
+        "practice_ms": {
+          "p50": 13.05,
+          "p95": 15.77,
+          "p99": 26.32
+        },
+        "answer_ms": {
+          "p50": 3.01,
+          "p95": 4.62,
+          "p99": 5.61
+        }
+      },
+      {
+        "t": 30,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.27,
+          "p95": 34.79,
+          "p99": 37.71
+        },
+        "practice_ms": {
+          "p50": 13.01,
+          "p95": 15.98,
+          "p99": 17.66
+        },
+        "answer_ms": {
+          "p50": 3.11,
+          "p95": 4.1,
+          "p99": 4.36
+        }
+      },
+      {
+        "t": 40,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.56,
+          "p95": 35.56,
+          "p99": 36.98
+        },
+        "practice_ms": {
+          "p50": 13.47,
+          "p95": 16.2,
+          "p99": 17.63
+        },
+        "answer_ms": {
+          "p50": 3.21,
+          "p95": 4.08,
+          "p99": 4.39
+        }
+      },
+      {
+        "t": 50,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.31,
+          "p95": 34.96,
+          "p99": 35.92
+        },
+        "practice_ms": {
+          "p50": 13.33,
+          "p95": 16.32,
+          "p99": 17.28
+        },
+        "answer_ms": {
+          "p50": 3.16,
+          "p95": 4.17,
+          "p99": 4.42
+        }
+      },
+      {
+        "t": 60,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.06,
+          "p95": 34.34,
+          "p99": 37.02
+        },
+        "practice_ms": {
+          "p50": 12.84,
+          "p95": 15.8,
+          "p99": 18.79
+        },
+        "answer_ms": {
+          "p50": 3.03,
+          "p95": 4.13,
+          "p99": 5.21
+        }
+      },
+      {
+        "t": 70,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.34,
+          "p95": 34.32,
+          "p99": 35.8
+        },
+        "practice_ms": {
+          "p50": 13.37,
+          "p95": 15.78,
+          "p99": 16.07
+        },
+        "answer_ms": {
+          "p50": 3.2,
+          "p95": 4.16,
+          "p99": 4.55
+        }
+      },
+      {
+        "t": 80,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.21,
+          "p95": 35.32,
+          "p99": 38.56
+        },
+        "practice_ms": {
+          "p50": 13.3,
+          "p95": 16.07,
+          "p99": 18.02
+        },
+        "answer_ms": {
+          "p50": 3.22,
+          "p95": 4.07,
+          "p99": 4.56
+        }
+      },
+      {
+        "t": 90,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.45,
+          "p95": 34.7,
+          "p99": 36.19
+        },
+        "practice_ms": {
+          "p50": 13.44,
+          "p95": 15.96,
+          "p99": 17.35
+        },
+        "answer_ms": {
+          "p50": 3.18,
+          "p95": 4.18,
+          "p99": 4.63
+        }
+      },
+      {
+        "t": 100,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.23,
+          "p95": 35.22,
+          "p99": 36.33
+        },
+        "practice_ms": {
+          "p50": 13.25,
+          "p95": 16.01,
+          "p99": 17.67
+        },
+        "answer_ms": {
+          "p50": 3.18,
+          "p95": 4.44,
+          "p99": 5.16
+        }
+      },
+      {
+        "t": 110,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.0,
+          "p95": 34.56,
+          "p99": 36.08
+        },
+        "practice_ms": {
+          "p50": 13.06,
+          "p95": 15.94,
+          "p99": 16.84
+        },
+        "answer_ms": {
+          "p50": 3.14,
+          "p95": 4.13,
+          "p99": 4.86
+        }
+      },
+      {
+        "t": 120,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.19,
+          "p95": 34.73,
+          "p99": 39.11
+        },
+        "practice_ms": {
+          "p50": 13.24,
+          "p95": 16.21,
+          "p99": 18.85
+        },
+        "answer_ms": {
+          "p50": 3.1,
+          "p95": 4.28,
+          "p99": 4.7
+        }
+      },
+      {
+        "t": 130,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 31.21,
+          "p95": 35.32,
+          "p99": 36.14
+        },
+        "practice_ms": {
+          "p50": 13.15,
+          "p95": 16.38,
+          "p99": 17.4
+        },
+        "answer_ms": {
+          "p50": 3.1,
+          "p95": 4.28,
+          "p99": 4.94
+        }
+      },
+      {
+        "t": 140,
+        "started": 150,
+        "failed": 0,
+        "calls": 1050,
+        "errors": {},
+        "workflow_ms": {
+          "p50": 30.43,
+          "p95": 34.04,
+          "p99": 36.56
+        },
+        "practice_ms": {
+          "p50": 12.41,
+          "p95": 15.22,
+          "p99": 17.61
+        },
+        "answer_ms": {
+          "p50": 2.89,
+          "p95": 4.0,
+          "p99": 4.42
+        }
+      }
+    ],
+    "samples": [
+      {
+        "t": 0,
+        "available": 2,
+        "desired": 4,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 5,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 84706,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 5,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 76.18,
+        "db_cpu_at": "2026-11-18T07:13:33Z",
+        "db_cpu_window": "1m0.356s",
+        "connections": 6,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 86927,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 10,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 6,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 89159,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 15,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 7,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 91728,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 20,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 7,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 94277,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 25,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 96684,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 30,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 99191,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 35,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 101380,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 40,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 103693,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 45,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 106236,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 50,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 108651,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 55,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 110954,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 60,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 113205,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 65,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 74.74,
+        "db_cpu_at": "2026-11-18T07:14:37Z",
+        "db_cpu_window": "1m3.705s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 116079,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 70,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 118328,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 75,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 120766,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 80,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 123214,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 85,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 125498,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 90,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 127816,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 95,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 130435,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 100,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 132804,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 105,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 135205,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 110,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 137520,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 115,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 139915,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 120,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 142470,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 125,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 73.09,
+        "db_cpu_at": "2026-11-18T07:15:40Z",
+        "db_cpu_window": "1m3.171s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 144988,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 130,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 72.19,
+        "db_cpu_at": "2026-11-18T07:16:39Z",
+        "db_cpu_window": "58.48s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 147215,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 135,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 72.19,
+        "db_cpu_at": "2026-11-18T07:16:39Z",
+        "db_cpu_window": "58.48s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 149656,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 140,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 72.19,
+        "db_cpu_at": "2026-11-18T07:16:39Z",
+        "db_cpu_window": "58.48s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 1,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 152007,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 145,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 72.19,
+        "db_cpu_at": "2026-11-18T07:16:39Z",
+        "db_cpu_window": "58.48s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 154352,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      },
+      {
+        "t": 150,
+        "available": 4,
+        "desired": 4,
+        "db_cpu_m": 72.19,
+        "db_cpu_at": "2026-11-18T07:16:39Z",
+        "db_cpu_window": "58.48s",
+        "connections": 8,
+        "max_connections": 100,
+        "active": 0,
+        "lock_waits": 0,
+        "deadlocks": 0,
+        "transactions": 156597,
+        "stats_reset": null,
+        "started": "2026-11-18T06:27:07.187603+00:00"
+      }
+    ]
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "before": {
+    "phase": "idle",
+    "available": 2,
+    "desired": 2,
+    "cpu": null,
+    "pods": [
+      "app-64cbcf59cd-2v2xr",
+      "app-64cbcf59cd-ckm5f"
+    ],
+    "control": "2 / 5 ready · Up to 3 min of local CPU load."
+  },
+  "history": [
+    {
+      "elapsed": 0,
+      "phase": "idle",
+      "available": 2,
+      "desired": 2,
+      "cpu": null,
+      "pods": [
+        "app-64cbcf59cd-2v2xr",
+        "app-64cbcf59cd-ckm5f"
+      ],
+      "control": "2 / 5 ready · Up to 3 min of local CPU load."
+    },
+    {
+      "elapsed": 1,
+      "phase": "running",
+      "available": 2,
+      "desired": 2,
+      "cpu": null,
+      "pods": [
+        "app-64cbcf59cd-2v2xr",
+        "app-64cbcf59cd-ckm5f"
+      ],
+      "control": "2 / 5 ready · Applying CPU load…"
+    },
+    {
+      "elapsed": 111,
+      "phase": "running",
+      "available": 2,
+      "desired": 4,
+      "cpu": 301,
+      "pods": [
+        "app-64cbcf59cd-2v2xr",
+        "app-64cbcf59cd-ckm5f"
+      ],
+      "control": "2 / 5 ready · Applying CPU load…"
+    },
+    {
+      "elapsed": 114,
+      "phase": "running",
+      "available": 4,
+      "desired": 4,
+      "cpu": 301,
+      "pods": [
+        "app-64cbcf59cd-2v2xr",
+        "app-64cbcf59cd-ckm5f",
+        "app-64cbcf59cd-qr4qb",
+        "app-64cbcf59cd-zsftg"
+      ],
+      "control": "4 / 5 ready · Applying CPU load…"
+    },
+    {
+      "elapsed": 126,
+      "phase": "running",
+      "available": 4,
+      "desired": 5,
+      "cpu": 301,
+      "pods": [
+        "app-64cbcf59cd-2v2xr",
+        "app-64cbcf59cd-ckm5f",
+        "app-64cbcf59cd-qr4qb",
+        "app-64cbcf59cd-zsftg"
+      ],
+      "control": "4 / 5 ready · Applying CPU load…"
+    },
+    {
+      "elapsed": 129,
+      "phase": "reached",
+      "available": 5,
+      "desired": 5,
+      "cpu": 301,
+      "pods": [
+        "app-64cbcf59cd-2v2xr",
+        "app-64cbcf59cd-5m5b2",
+        "app-64cbcf59cd-ckm5f",
+        "app-64cbcf59cd-qr4qb",
+        "app-64cbcf59cd-zsftg"
+      ],
+      "control": "5 / 5 ready · Reached 5. Load stopped."
+    }
+  ]
+}

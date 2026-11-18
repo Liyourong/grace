@@ -426,6 +426,7 @@ dependencies = [
  "argon2",
  "axum",
  "deadpool-postgres",
+ "futures-util",
  "hex",
  "rand_core 0.6.4",
  "reqwest",

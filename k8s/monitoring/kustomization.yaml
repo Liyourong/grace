@@ -1,0 +1,4 @@
+namespace: grace
+resources:
+  - access.yaml
+  - dashboard.yaml
