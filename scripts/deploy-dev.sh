@@ -2,12 +2,7 @@
 set -euo pipefail
 [[ "$GITHUB_REF" == refs/heads/dev && "$GITHUB_EVENT_NAME" == push ]]
 : "${DIGITALOCEAN_ACCESS_TOKEN:?Missing ci-cd-pipeline environment secret}"
-# One release number per first-parent dev commit after the last pre-pipeline commit.
-baseline=bcffa6bb4bb0eaae2827e45d48b82b2bec4eef46
-git merge-base --is-ancestor "$baseline" "$GITHUB_SHA"
-count=$(git rev-list --first-parent --count "$baseline..$GITHUB_SHA")
-(( count > 0 ))
-version="v$((5 + count))"
+version=$(bash scripts/release-version.sh "$GITHUB_SHA")
 k=(kubectl -n grace)
 retry() {
   local attempt
@@ -85,7 +80,7 @@ site="$RUNNER_TEMP/registry-site"
 mkdir -p "$site"
 docker compose cp app:/app/frontend/. "$site/"
 python3 tests/check_site.py http://localhost:8090 "$site"
-SMOKE_PSQL="docker compose exec -T db psql -U grace -d grace -v ON_ERROR_STOP=1 -q" python3 tests/smoke.py http://localhost:8090
+python3 tests/smoke.py http://localhost:8090
 docker compose down --volumes
 check_head
 publish_alias "$REGISTRY_IMAGE:$version"
@@ -127,5 +122,5 @@ done
   and (.status.readyReplicas > 0 and .status.readyReplicas == .spec.replicas)'
 "${k[@]}" wait --for=jsonpath='{.status.phase}'=Bound pvc/data-db-0 --timeout=60s
 retry python3 tests/check_site.py "$base" "$site"
-SMOKE_PSQL="kubectl -n grace exec -i statefulset/db -- psql -U grace -d grace -v ON_ERROR_STOP=1 -q" python3 tests/smoke.py "$base"
+python3 tests/smoke.py "$base"
 echo "Verified $version at $base (health, assets and business checks)." >> "$GITHUB_STEP_SUMMARY"

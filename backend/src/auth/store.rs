@@ -1,5 +1,7 @@
 //! SQL for the tables this module owns: `users`, `sessions`, `auth_credentials`, `email_verifications`.
 
+use std::time::SystemTime;
+
 use deadpool_postgres::{GenericClient, Object, Pool};
 use tokio_postgres::error::SqlState;
 
@@ -30,7 +32,7 @@ pub async fn init(pool: &Pool) -> Result<()> {
 
 pub enum Start {
     /// A registration is waiting for `code`, which the caller now has to email.
-    Sent,
+    Sent(SystemTime),
     UsernameTaken,
     EmailTaken,
     /// An email went to this address less than a cooldown ago; try again in this many seconds.
@@ -61,19 +63,19 @@ pub async fn start_registration(
              ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username, password_hash = EXCLUDED.password_hash,
                  code = EXCLUDED.code, failed_attempts = 0, send_count = 1, last_sent_at = now()
              WHERE email_verifications.last_sent_at <= now() - make_interval(secs => $5)
-             RETURNING 1",
+             RETURNING last_sent_at",
             &[&email, &username, &password_hash, &code, &(RESEND_COOLDOWN_SECONDS as f64)],
         )
         .await?;
-    if stored.is_some() {
-        return Ok(Start::Sent);
+    if let Some(row) = stored {
+        return Ok(Start::Sent(row.get(0)));
     }
     Ok(Start::TooSoon(wait_seconds(db, email).await?))
 }
 
 pub enum Resend {
     /// Email this code again (it is the one already issued, so earlier emails stay valid).
-    Sent(String),
+    Sent(String, SystemTime),
     NoPending,
     TooSoon(i64),
     LimitReached,
@@ -84,12 +86,12 @@ pub async fn resend(db: &Object, email: &str) -> Result<Resend> {
         .query_opt(
             "UPDATE email_verifications SET last_sent_at = now(), send_count = send_count + 1
              WHERE email = $1 AND send_count < $2 AND last_sent_at <= now() - make_interval(secs => $3)
-             RETURNING code",
+             RETURNING code, last_sent_at",
             &[&email, &MAX_SENDS, &(RESEND_COOLDOWN_SECONDS as f64)],
         )
         .await?;
     if let Some(row) = row {
-        return Ok(Resend::Sent(row.get(0)));
+        return Ok(Resend::Sent(row.get(0), row.get(1)));
     }
     let pending = db.query_opt("SELECT send_count FROM email_verifications WHERE email = $1", &[&email]).await?;
     Ok(match pending {
@@ -100,11 +102,12 @@ pub async fn resend(db: &Object, email: &str) -> Result<Resend> {
 }
 
 /// The send did not happen (SendGrid failed), so give the cooldown and the send back.
-pub async fn unsend(db: &Object, email: &str) -> Result<()> {
+pub async fn unsend(pool: &Pool, email: &str, sent_at: SystemTime) -> Result<()> {
+    let db = pool.get().await?;
     db.execute(
         "UPDATE email_verifications SET last_sent_at = to_timestamp(0), send_count = GREATEST(send_count - 1, 0)
-         WHERE email = $1",
-        &[&email],
+         WHERE email = $1 AND last_sent_at = $2",
+        &[&email, &sent_at],
     )
     .await?;
     Ok(())

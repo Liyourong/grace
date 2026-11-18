@@ -46,7 +46,7 @@ Each registration allows 5 wrong codes and one email per address per 60 seconds,
 a resend repeats the same code, so earlier emails stay valid.
 
 The backend reads these environment variables. In Kubernetes they come from the Secret `grace-sendgrid`
-(optional, so pods still start without it; registration answers `503` until it exists). Never commit them.
+on DOKS. The app requires the API key and sender at startup. Demo settings are optional.
 
 | Variable | Purpose |
 | --- | --- |
@@ -59,16 +59,17 @@ Create the Secret in the cluster before merging to `dev` (the key file stays on 
 ```sh
 kubectl -n grace create secret generic grace-sendgrid \
   --from-file=SENDGRID_API_KEY=sendgrid-api-key.txt \
-  --from-literal=SENDGRID_FROM_EMAIL='verified-sender@example.com' \
-  --from-literal=DEMO_EMAIL='demo@example.com' --from-literal=DEMO_CODE='123456'
+  --from-literal=SENDGRID_FROM_EMAIL='verified-sender@example.com'
 kubectl -n grace rollout restart deployment/app   # env from a Secret is read at start-up
 ```
 
 After deploying, register a real address on the live site and confirm the email arrives. Locally, put the same
 variables in an untracked `.env` next to `compose.yaml`.
 
-The smoke tests (`tests/smoke.py`) skip registration. They create their test users and sessions directly in the
-database through the psql command in `SMOKE_PSQL` (set by CI and `scripts/deploy-dev.sh`) and delete them afterwards.
+The smoke tests check the homepage, health endpoints and anonymous access. For an HTTP loopback
+target in the temporary `grace-ci` and `grace-release` Compose projects, they also create short-lived test
+sessions and exercise uploads, grading, isolation and progress recovery. Public checks use anonymous HTTP.
+
 
 ## CI and deployment
 
@@ -103,9 +104,9 @@ The workflow deploys by digest and records the old and new images in Actions.
 
 The job checks the exact registry image in Compose, dry-runs the Kubernetes
 manifest and checks the current head of `dev` before applying it. It verifies
-the rollouts, database PVC, public health, frontend files, grading and sign-in
-recovery. Each public business check creates two test accounts and private
-sample papers. Inspect the Actions summary for the release number and result.
+the rollouts, database PVC, public health, frontend files and anonymous access.
+Grading and progress recovery run against the temporary Compose database.
+Inspect the Actions summary for the release number and result.
 
 If acceptance fails after switching the app, the job restores its previous
 image and checks the public homepage and readiness. This rollback covers

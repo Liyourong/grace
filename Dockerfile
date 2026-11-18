@@ -10,6 +10,7 @@ WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
+ARG VITE_GRACE_VERSION
 RUN npm run build
 
 FROM debian:trixie-slim

@@ -15,7 +15,10 @@ services:
     restart: unless-stopped
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_GRACE_VERSION: ${GRACE_RELEASE_VERSION:-}
     environment:
       DATABASE_URL: postgres://grace:${POSTGRES_PASSWORD:-grace_local_only}@db:5432/grace
       APP_ORIGINS: ${APP_ORIGINS:-http://localhost:8090,http://127.0.0.1:8090}
