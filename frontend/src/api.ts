@@ -13,6 +13,7 @@ export type PaperSummary = {
   stats: Stats
 }
 export type Answer = { saved_answer: string; is_correct: boolean; correct_answer: string; explanation: string }
+export type ExplainResponse = { explanation: string }
 export type Question = {
   id: string
   kind: "choice" | "translation" | "sentence"
