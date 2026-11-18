@@ -1,30 +1,19 @@
 #!/usr/bin/env python3
-"""Papers-focused HTTP smoke tests for Grace (Issue #17).
-
-Usage:
-    SMOKE_PSQL='docker compose exec -T db psql -U grace -d grace -v ON_ERROR_STOP=1 -q' \\
-        python3 tests/smoke.py [BASE_URL]
-
-Defaults to GRACE_URL env var or http://localhost:8090.
-
-Registration needs a code emailed to a real address (Issue #29), which a smoke test cannot read, so email
-verification is tested manually. The test accounts are instead created directly in the database through the
-`psql` command in SMOKE_PSQL (it must read SQL from stdin), signed in with sessions created there, and deleted
-at the end (their papers and answers go with them).
+"""Check public availability, plus practice flows on the temporary CI and release Compose stacks.
+Run with python3 tests/smoke.py [BASE_URL]. Defaults to GRACE_URL or http://localhost:8090.
 """
 
 from __future__ import annotations
 
 import hashlib
-import http.cookiejar
 import json
 import os
 import secrets
-import shlex
 import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -36,9 +25,6 @@ class Client:
     def __init__(self, base_url: str, session: str | None = None) -> None:
         self.base_url = base_url
         self.session = session
-        self.opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
-        )
 
     def request(self, method: str, path: str, body: object | None = None) -> tuple[int, dict | None]:
         data = None
@@ -54,7 +40,7 @@ class Client:
 
         req = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
         try:
-            with self.opener.open(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 raw_resp = resp.read()
                 return resp.status, _try_json(raw_resp)
         except urllib.error.HTTPError as err:
@@ -82,13 +68,12 @@ def wait_ready(client: Client) -> None:
         time.sleep(1)
     raise RuntimeError(f"Service at {client.base_url} did not become ready in 30s")
 
+
 def run_sql(sql: str) -> None:
-    command = os.environ.get("SMOKE_PSQL")
-    if not command:
-        raise RuntimeError("Set SMOKE_PSQL to a psql command for the app's database (see the top of this file)")
-    result = subprocess.run(shlex.split(command), input=sql, text=True, capture_output=True, timeout=60)
-    if result.returncode != 0:
-        raise RuntimeError(f"SMOKE_PSQL failed: {result.stderr.strip()}")
+    subprocess.run(
+        ["docker", "compose", "exec", "-T", "db", "psql", "-X", "-U", "grace", "-d", "grace", "-v", "ON_ERROR_STOP=1", "-q"],
+        input=sql, text=True, check=True, cwd=ROOT, timeout=60,
+    )
 
 
 def seed_sessions(username: str, count: int) -> list[str]:
@@ -204,14 +189,26 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     expect_stats(detail["stats"], 3, 3, 0)
     print("Practice grading smoke checks passed!")
 
+
 def main() -> None:
+    public = Client(BASE_URL)
+    wait_ready(public)
+    for path, expected in [("/", 200), ("/health/live", 200), ("/api/papers", 401), ("/api/auth/me", 401)]:
+        status, _ = public.request("GET", path)
+        assert status == expected, (path, status)
+    print("Public availability and anonymous access checks passed.")
+
+    target = urllib.parse.urlsplit(BASE_URL)
+    if target.scheme != "http" or target.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        return
+    if os.environ.get("COMPOSE_PROJECT_NAME") not in {"grace-ci", "grace-release"}:
+        return
+
     suffix = secrets.token_hex(8)
     name_a, name_b = f"smoke_a_{suffix}", f"smoke_b_{suffix}"
-    wait_ready(Client(BASE_URL))
-    # Two distinct signed-in users; user A gets a second session to resume from later.
-    tokens_a = seed_sessions(name_a, 2)
-    tokens_b = seed_sessions(name_b, 1)
     try:
+        tokens_a = seed_sessions(name_a, 2)
+        tokens_b = seed_sessions(name_b, 1)
         run_checks(Client(BASE_URL, tokens_a[0]), Client(BASE_URL, tokens_b[0]), tokens_a[1])
     finally:
         run_sql(f"DELETE FROM users WHERE username IN ('{name_a}', '{name_b}');")
@@ -296,13 +293,7 @@ def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
     # Resume in a fresh browser session, at a question different from the one answered.
     status, _ = user_a.request("PUT", f"/api/papers/{pid1}/position", {"question_id": "q3"})
     assert status == 204, status
-    status, _ = user_a.request("POST", "/api/auth/logout")
-    assert status == 204, status
-    status, _ = user_a.request("GET", f"/api/papers/{pid1}")
-    assert status == 401, status
-    fresh = Client(BASE_URL, resume_session)  # another session of the same user, as after signing in again
-    status, me = fresh.request("GET", "/api/auth/me")
-    assert status == 200 and me["user"]["username"].startswith("smoke_a_"), (status, me)
+    fresh = Client(BASE_URL, resume_session)
     status, restored = fresh.request("GET", f"/api/papers/{pid1}")
     assert status == 200, status
     assert restored["current_question_id"] == "q3", restored

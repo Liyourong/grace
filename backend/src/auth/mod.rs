@@ -147,23 +147,21 @@ async fn register(State(s): State<AppState>, Body(c): Body<Registration>) -> Res
     })?;
 
     let code = rules::generate_code();
-    let db = s.pool.get().await?;
-    match store::start_registration(&db, &email, &username, &hash, &code).await? {
-        store::Start::Sent => {}
+    let sent_at = match store::start_registration(&s.pool.get().await?, &email, &username, &hash, &code).await? {
+        store::Start::Sent(sent_at) => sent_at,
         store::Start::UsernameTaken => return Err(username_taken()),
         store::Start::EmailTaken => return Err(email_taken()),
         store::Start::TooSoon(wait) => return Err(too_soon(wait)),
-    }
-    deliver(&db, &email, &code).await?;
+    };
+    deliver(&s.pool, &email, &code, sent_at).await?;
     Ok((StatusCode::ACCEPTED, verification_json(&email)).into_response())
 }
 
 /// Emails the same code again. It does not invalidate the earlier emails.
 async fn resend(State(s): State<AppState>, Body(c): Body<EmailOnly>) -> Result<Response> {
     let email = rules::email(&c.email).ok_or_else(invalid_email)?;
-    let db = s.pool.get().await?;
-    let code = match store::resend(&db, &email).await? {
-        store::Resend::Sent(code) => code,
+    let (code, sent_at) = match store::resend(&s.pool.get().await?, &email).await? {
+        store::Resend::Sent(code, sent_at) => (code, sent_at),
         store::Resend::NoPending => return Err(no_pending()),
         store::Resend::TooSoon(wait) => return Err(too_soon(wait)),
         store::Resend::LimitReached => {
@@ -174,18 +172,18 @@ async fn resend(State(s): State<AppState>, Body(c): Body<EmailOnly>) -> Result<R
             ));
         }
     };
-    deliver(&db, &email, &code).await?;
+    deliver(&s.pool, &email, &code, sent_at).await?;
     Ok((StatusCode::ACCEPTED, verification_json(&email)).into_response())
 }
 
 /// Sends the code, or skips the send for the demo address, whose code is the configured one. If sending fails the
 /// cooldown is given back so the user can retry immediately.
-async fn deliver(db: &deadpool_postgres::Object, email: &str, code: &str) -> Result<()> {
+async fn deliver(pool: &Pool, email: &str, code: &str, sent_at: std::time::SystemTime) -> Result<()> {
     if email::demo().is_some_and(|(demo_email, _)| demo_email == email) {
         return Ok(());
     }
     let Err(failure) = email::send_code(email, code).await else { return Ok(()) };
-    if let Err(e) = store::unsend(db, email).await {
+    if let Err(e) = store::unsend(pool, email, sent_at).await {
         eprintln!("could not restore the resend allowance for a failed send: {e:?}");
     }
     Err(match failure {

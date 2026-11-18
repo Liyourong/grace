@@ -23,6 +23,23 @@ configMapGenerator:
     files:
       - backup.sh
 patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: app
+      spec:
+        template:
+          spec:
+            containers:
+              - name: grace
+                env:
+                  - name: SENDGRID_API_KEY
+                    valueFrom:
+                      secretKeyRef: { name: grace-sendgrid, key: SENDGRID_API_KEY, optional: false }
+                  - name: SENDGRID_FROM_EMAIL
+                    valueFrom:
+                      secretKeyRef: { name: grace-sendgrid, key: SENDGRID_FROM_EMAIL, optional: false }
   # Retain: deleting the PVC by mistake keeps the DO volume (and the data) instead of destroying it.
   - target: { kind: StatefulSet, name: db }
     patch: |-

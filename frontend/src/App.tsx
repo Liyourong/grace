@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Practice } from "@/Practice"
 
+const appName = import.meta.env.VITE_GRACE_VERSION ? `Grace ${import.meta.env.VITE_GRACE_VERSION}` : "Grace"
+
 const fmtTime = (iso: string) => new Date(iso).toLocaleString()
 // Same-title papers are distinct uploads; the upload time tells them apart in the sidebar.
 const shortTime = (iso: string) =>
@@ -64,8 +66,11 @@ export default function App() {
 
   if (view.name === "app") return <Shell user={view.user} onLogout={logout} onExpired={expired} />
   return (
-    <div className="flex min-h-svh items-center justify-center p-6">
-      <ThemeButton className="fixed top-4 right-4" />
+    <div className="flex min-h-svh items-center justify-center px-6 py-20">
+      <header className="absolute inset-x-0 top-0 flex items-center justify-between px-5 py-4">
+        <span className="text-sm font-semibold">{appName}</span>
+        <ThemeButton />
+      </header>
       {view.name === "loading" && <p className="text-muted-foreground">Loading…</p>}
       {view.name === "error" && (
         <div className="w-full max-w-sm">
@@ -333,7 +338,7 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
   return (
     <div className="flex min-h-svh flex-col md:h-svh md:flex-row">
       <aside className="flex shrink-0 flex-col gap-3 border-b bg-sidebar p-3 text-sidebar-foreground md:w-64 md:border-r md:border-b-0">
-        <div className="px-2 pt-1 text-lg font-semibold">Grace</div>
+        <div className="px-2 pt-1 text-lg font-semibold">{appName}</div>
         <Button variant="outline" className="justify-start" onClick={goHome}>
           <Plus /> Upload a paper
         </Button>
