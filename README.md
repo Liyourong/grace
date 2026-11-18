@@ -120,3 +120,7 @@ DOKS runs a daily `CronJob` (`postgres-backup` at 05:00 AM `America/Toronto`) th
 exports PostgreSQL with `pg_dump -Fc` and uploads private archives to DigitalOcean
 Spaces with 7-day retention. See [the DOKS backup and restore runbook](k8s/doks/README.md)
 for manual trigger, verification, and `pg_restore` recovery commands.
+
+## Operations dashboard
+
+Open the live cluster map, visualize concurrent logins and rehearse HPA scaling with the [dashboard runbook](dashboard/README.md).

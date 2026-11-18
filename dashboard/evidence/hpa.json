@@ -1,0 +1,82 @@
+[
+  {
+    "time": 1794983382,
+    "desired": 2,
+    "available": 2,
+    "cpu": 1,
+    "ready": [
+      "app-59ccf87887-2wg2w",
+      "app-59ccf87887-j79sb"
+    ]
+  },
+  {
+    "time": 1794983454,
+    "desired": 4,
+    "available": 4,
+    "cpu": 110,
+    "ready": [
+      "app-59ccf87887-2wg2w",
+      "app-59ccf87887-5kvzj",
+      "app-59ccf87887-j79sb",
+      "app-59ccf87887-zlvjm"
+    ]
+  },
+  {
+    "time": 1794983514,
+    "desired": 4,
+    "available": 4,
+    "cpu": 87,
+    "ready": [
+      "app-59ccf87887-2wg2w",
+      "app-59ccf87887-5kvzj",
+      "app-59ccf87887-j79sb",
+      "app-59ccf87887-zlvjm"
+    ]
+  },
+  {
+    "time": 1794983574,
+    "desired": 4,
+    "available": 4,
+    "cpu": 7,
+    "ready": [
+      "app-59ccf87887-2wg2w",
+      "app-59ccf87887-5kvzj",
+      "app-59ccf87887-j79sb",
+      "app-59ccf87887-zlvjm"
+    ]
+  },
+  {
+    "time": 1794983634,
+    "desired": 4,
+    "available": 4,
+    "cpu": 1,
+    "ready": [
+      "app-59ccf87887-2wg2w",
+      "app-59ccf87887-5kvzj",
+      "app-59ccf87887-j79sb",
+      "app-59ccf87887-zlvjm"
+    ]
+  },
+  {
+    "time": 1794983859,
+    "desired": 2,
+    "available": 2,
+    "cpu": 1,
+    "ready": [
+      "app-59ccf87887-2wg2w",
+      "app-59ccf87887-5kvzj",
+      "app-59ccf87887-j79sb",
+      "app-59ccf87887-zlvjm"
+    ]
+  },
+  {
+    "time": 1794983901,
+    "desired": 2,
+    "available": 2,
+    "cpu": 1,
+    "ready": [
+      "app-59ccf87887-2wg2w",
+      "app-59ccf87887-j79sb"
+    ]
+  }
+]

@@ -9,6 +9,7 @@ spec:
   template:
     metadata:
       labels: { app: grace }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9101" }
     spec:
       securityContext:
         runAsNonRoot: true
@@ -19,6 +20,7 @@ spec:
           envFrom:
             - configMapRef: { name: grace-config }
           env:
+            - { name: METRICS_PORT, value: "9101" }
             - name: POSTGRES_PASSWORD
               valueFrom: { secretKeyRef: { name: grace-db, key: password } }
             # The secret is hex, so it is safe inside a URL without escaping.

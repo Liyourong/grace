@@ -7,6 +7,8 @@
 
 mod auth;
 mod common;
+mod demo_cpu;
+mod observation;
 mod papers;
 mod practice;
 
@@ -58,8 +60,13 @@ async fn main() {
         .merge(papers::router())
         .merge(practice::router())
         .layer(from_fn_with_state(state.clone(), require_origin))
-        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES));
+        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+        .layer(axum::middleware::from_fn(observation::record));
 
+    observation::start_metrics().await;
+    if std::env::var("GRACE_HPA_DEMO").as_deref() == Ok("1") {
+        tokio::spawn(demo_cpu::run());
+    }
     let app = Router::new()
         .merge(api)
         .route("/health/live", get(|| async { StatusCode::OK }))

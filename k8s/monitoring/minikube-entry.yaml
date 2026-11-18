@@ -1,0 +1,22 @@
+# Forward to this proxy during rehearsals so requests traverse the real app Service.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: caddy, namespace: grace }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: caddy } }
+  template:
+    metadata: { labels: { app: caddy } }
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:2
+          command: [caddy, reverse-proxy, --from, ":8090", --to, "http://app:80"]
+          ports: [{ containerPort: 8090 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: caddy, namespace: grace }
+spec:
+  selector: { app: caddy }
+  ports: [{ port: 8090, targetPort: 8090 }]

@@ -1,0 +1,66 @@
+{
+  "end": 1794983715,
+  "range_seconds": 900,
+  "samples": {
+    "answers": {
+      "series": 1,
+      "min": 0.0,
+      "max": 1.0172004914426127
+    },
+    "available": {
+      "series": 1,
+      "min": 2.0,
+      "max": 4.0
+    },
+    "capacity": {
+      "series": 0,
+      "min": null,
+      "max": null
+    },
+    "cpu": {
+      "series": 2,
+      "min": 4.42425982288186,
+      "max": 79.83037619047384
+    },
+    "desired": {
+      "series": 1,
+      "min": 2.0,
+      "max": 4.0
+    },
+    "failures": {
+      "series": 1,
+      "min": 50.0,
+      "max": 50.0
+    },
+    "latency": {
+      "series": 1,
+      "min": 3.4475835,
+      "max": 3.447583500000001
+    },
+    "memory": {
+      "series": 2,
+      "min": 49.15460364352535,
+      "max": 64.67597242737568
+    },
+    "netIn": {
+      "series": 2,
+      "min": 752.9147455555556,
+      "max": 296699.3299925555
+    },
+    "netOut": {
+      "series": 2,
+      "min": 546.6392438888888,
+      "max": 146539.63371079726
+    },
+    "pvc": {
+      "series": 0,
+      "min": null,
+      "max": null
+    },
+    "root": {
+      "series": 2,
+      "min": 9.446640270015216,
+      "max": 9.452440202194513
+    }
+  }
+}

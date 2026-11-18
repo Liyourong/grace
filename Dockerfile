@@ -3,6 +3,7 @@ WORKDIR /src
 COPY backend/Cargo.toml backend/Cargo.lock ./
 RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && rm -rf src
 COPY backend/ ./
+COPY dashboard/app.js dashboard/index.html dashboard/style.css /dashboard/
 RUN touch src/main.rs && cargo build --release
 
 FROM node:24-slim AS web
@@ -14,7 +15,7 @@ ARG VITE_GRACE_VERSION
 RUN npm run build
 
 FROM debian:trixie-slim
-COPY --from=build /src/target/release/grace /usr/local/bin/grace
+COPY --from=build /src/target/release/grace /src/target/release/dashboard /usr/local/bin/
 COPY --from=web /web/dist/ /app/frontend/
 ENV STATIC_DIR=/app/frontend PORT=8080
 EXPOSE 8080
