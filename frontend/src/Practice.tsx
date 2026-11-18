@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, ArrowRight, ArrowUp, Check, X } from "lucide-react"
 
-import { api, type Answer, type ApiError, type Paper, type Question, type Stats } from "@/api"
+import { api, type Answer, type ApiError, type ExplainResponse, type Paper, type Question, type Stats } from "@/api"
 import { Notice } from "@/components/notice"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,12 @@ const OK = "border-emerald-600/50! text-emerald-700 dark:text-emerald-400"
 const BAD = "border-destructive/50! text-destructive"
 
 type Warn = { kind: "error" | "warn"; message: string }
+type ExplainState = {
+  paperId: string
+  questionId: string
+  status: "loading" | "success" | "error"
+  message?: string
+}
 
 export function Practice(props: {
   paperId: string
@@ -32,6 +38,13 @@ export function Practice(props: {
   const [warn, setWarn] = useState<Warn | null>(null)
   const [busy, setBusy] = useState(false)
   const [finished, setFinished] = useState(false)
+  const [explain, setExplain] = useState<ExplainState | null>(null)
+  // Every new answer, question, or paper invalidates older Function responses.
+  const explainRequestId = useRef(0)
+  function clearExplain() {
+    explainRequestId.current += 1
+    setExplain(null)
+  }
   // Unsubmitted text lives only in this page; it is never saved or restored.
   const [drafts, setDrafts] = useState(() => new Map<string, string>())
   // Answer and position writes both move the saved position, so send them strictly in click order.
@@ -54,6 +67,8 @@ export function Practice(props: {
     })
     return () => {
       cancelled = true
+      // Also discard a pending explanation when switching papers/unmounting.
+      explainRequestId.current += 1
     }
   }, [base, attempt, onExpired])
 
@@ -78,8 +93,13 @@ export function Practice(props: {
   const { questions, stats } = paper
   const q = questions[index]
   const last = index === questions.length - 1
+  const hasUnsavedChanges =
+    q.kind !== "choice" &&
+    !!q.answer &&
+    (drafts.get(q.id) ?? q.answer.saved_answer) !== q.answer.saved_answer
 
   async function go(i: number) {
+    clearExplain()
     setIndex(i)
     setFinished(false)
     const r = await send("PUT", `${base}/position`, { question_id: questions[i].id })
@@ -89,6 +109,7 @@ export function Practice(props: {
   }
 
   async function submit(q: Question, payload: { option_id: string } | { text: string }) {
+    clearExplain()
     setBusy(true)
     const r = await send<{ answer: Answer; stats: Stats }>("PUT", `${base}/answers/${encodeURIComponent(q.id)}`, payload)
     setBusy(false)
@@ -113,7 +134,24 @@ export function Practice(props: {
     }
   }
 
+  async function explainSaved(q: Question) {
+    if (!q.answer) return
+    const id = ++explainRequestId.current
+    setExplain({ paperId, questionId: q.id, status: "loading" })
+    // No answer or secret is sent from the browser. The backend loads the saved answer.
+    const r = await api<ExplainResponse>("POST", `${base}/answers/${encodeURIComponent(q.id)}/explain`)
+    if (id !== explainRequestId.current) return
+    if (r.ok) {
+      setExplain({ paperId, questionId: q.id, status: "success", message: r.data.explanation })
+    } else if (r.status === 401) {
+      onExpired("an explanation could not be requested")
+    } else {
+      setExplain({ paperId, questionId: q.id, status: "error", message: r.error.message })
+    }
+  }
+
   async function finish() {
+    clearExplain()
     const r = await send<{ stats: Stats }>("POST", `${base}/finish`)
     if (r.status === 401) return onExpired("the practice could not be finished")
     if (!r.ok) return setWarn({ kind: "error", message: r.error.message })
@@ -210,12 +248,24 @@ export function Practice(props: {
                 saved={q.answer?.saved_answer}
                 value={drafts.get(q.id) ?? q.answer?.saved_answer ?? ""}
                 busy={busy}
-                onDraft={(text) => setDrafts((previous) => new Map(previous).set(q.id, text))}
+                onDraft={(text) => {
+                  clearExplain()
+                  setDrafts((previous) => new Map(previous).set(q.id, text))
+                }}
                 onEmpty={() => setWarn({ kind: "warn", message: "Please enter an answer first." })}
                 onSubmit={(text) => submit(q, { text })}
               />
             )}
-            {q.answer && <Feedback q={q} a={q.answer} />}
+            {q.answer && (
+              <Feedback
+                q={q}
+                a={q.answer}
+                busy={busy}
+                explain={explain?.paperId === paperId && explain.questionId === q.id ? explain : null}
+                onExplain={() => explainSaved(q)}
+                hasUnsavedChanges={hasUnsavedChanges}
+              />
+            )}
             <div className="flex justify-between">
               <Button variant="ghost" disabled={index === 0} onClick={() => go(index - 1)}>
                 <ArrowLeft /> Previous
@@ -275,7 +325,21 @@ function TextAnswer(props: {
   )
 }
 
-function Feedback({ q, a }: { q: Question; a: Answer }) {
+function Feedback({
+  q,
+  a,
+  busy,
+  explain,
+  onExplain,
+  hasUnsavedChanges,
+}: {
+  q: Question
+  a: Answer
+  busy: boolean
+  explain: ExplainState | null
+  onExplain: () => void
+  hasUnsavedChanges: boolean
+}) {
   const rows = [
     ...(q.kind === "choice" ? [] : [["Your answer", a.saved_answer]]),
     ["Reference answer", a.correct_answer],
@@ -295,6 +359,40 @@ function Feedback({ q, a }: { q: Question; a: Answer }) {
           </div>
         ))}
       </dl>
+      <div className="grid justify-items-start gap-2 border-t pt-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onExplain}
+          disabled={
+            busy ||
+            hasUnsavedChanges ||
+            explain?.status === "loading" ||
+            explain?.status === "success"
+          }
+        >
+          {explain?.status === "loading"
+            ? "Explaining…"
+            : explain?.status === "success"
+              ? "Explained"
+              : explain?.status === "error"
+                ? "Retry Explain"
+                : "Explain"}
+        </Button>
+        {hasUnsavedChanges && (
+          <p className="text-muted-foreground">Submit your edited answer before requesting a new explanation.</p>
+        )}
+        {explain?.status === "success" && (
+          <div className="grid gap-1 text-foreground" role="status">
+            <strong>Additional explanation</strong>
+            <p className="whitespace-pre-wrap font-normal">{explain.message}</p>
+          </div>
+        )}
+        {explain?.status === "error" && (
+          <p className="text-destructive" role="alert">Explanation unavailable: {explain.message}. Please try again.</p>
+        )}
+      </div>
     </div>
   )
 }

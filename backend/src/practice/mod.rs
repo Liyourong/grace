@@ -4,6 +4,7 @@
 //! Owns tables: `answers`, `paper_progress`.
 //! Uses: `papers::get`, `papers::find_question` to look up questions and check ownership.
 
+mod explain;
 mod rules;
 mod store;
 
@@ -29,6 +30,7 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/papers/{paper_id}/answers/{question_id}", put(save_answer))
+        .route("/api/papers/{paper_id}/answers/{question_id}/explain", post(explain_answer))
         .route("/api/papers/{paper_id}/position", put(save_position))
         .route("/api/papers/{paper_id}/finish", post(finish))
 }
@@ -65,6 +67,26 @@ async fn save_answer(
         },
         "stats": stats(&db, paper_id, user.id).await?,
     })))
+}
+
+/// Explain the signed-in user's last saved answer. Never changes grades or progress.
+async fn explain_answer(
+    State(s): State<AppState>,
+    user: CurrentUser,
+    Path((paper_id, question_id)): Path<(String, String)>,
+) -> Result<Json<Value>> {
+    let paper_id = parse_id(&paper_id)?;
+    let db = s.pool.get().await?;
+    let q = find_question(&db, paper_id, user.id, &question_id).await?;
+    let existing = store::answers(&db, user.id, &[q.id]).await?;
+    let saved = existing.get(&q.id).ok_or_else(|| {
+        AppError::bad_request("answer_not_saved", "Submit an answer before requesting an explanation")
+    })?;
+    let payload = explain::payload(&q, &saved.answer, saved.is_correct)?;
+    // Do not hold a PostgreSQL pool connection during an external HTTP request.
+    drop(db);
+    let explanation = explain::request(payload).await?;
+    Ok(Json(json!({ "explanation": explanation })))
 }
 
 #[derive(Deserialize)]
