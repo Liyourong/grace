@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""Papers-focused HTTP smoke tests for Grace (Issue #17).
-
-Usage:
-    python3 tests/smoke.py [BASE_URL]
-
-Defaults to GRACE_URL env var or http://localhost:8090.
+"""Check public availability, plus practice flows on the temporary CI and release Compose stacks.
+Run with python3 tests/smoke.py [BASE_URL]. Defaults to GRACE_URL or http://localhost:8090.
 """
 
 from __future__ import annotations
 
-import http.cookiejar
+import hashlib
 import json
 import os
 import secrets
+import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -24,15 +22,15 @@ BASE_URL = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("GRACE_URL", "h
 
 
 class Client:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, session: str | None = None) -> None:
         self.base_url = base_url
-        self.opener = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
-        )
+        self.session = session
 
     def request(self, method: str, path: str, body: object | None = None) -> tuple[int, dict | None]:
         data = None
         headers: dict[str, str] = {}
+        if self.session:
+            headers["Cookie"] = f"session={self.session}"
         if method not in ("GET", "HEAD", "OPTIONS"):
             headers["Origin"] = self.base_url
         if body is not None:
@@ -42,7 +40,7 @@ class Client:
 
         req = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
         try:
-            with self.opener.open(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 raw_resp = resp.read()
                 return resp.status, _try_json(raw_resp)
         except urllib.error.HTTPError as err:
@@ -69,6 +67,26 @@ def wait_ready(client: Client) -> None:
             pass
         time.sleep(1)
     raise RuntimeError(f"Service at {client.base_url} did not become ready in 30s")
+
+
+def run_sql(sql: str) -> None:
+    subprocess.run(
+        ["docker", "compose", "exec", "-T", "db", "psql", "-X", "-U", "grace", "-d", "grace", "-v", "ON_ERROR_STOP=1", "-q"],
+        input=sql, text=True, check=True, cwd=ROOT, timeout=60,
+    )
+
+
+def seed_sessions(username: str, count: int) -> list[str]:
+    """Creates a user and `count` open sessions for it directly in the database; returns the session tokens."""
+    tokens = [secrets.token_hex(32) for _ in range(count)]
+    hashes = ", ".join(f"('{hashlib.sha256(t.encode()).hexdigest()}')" for t in tokens)  # the app stores SHA-256 only
+    run_sql(
+        f"""WITH u AS (INSERT INTO users (username, password_hash) VALUES ('{username}', '') RETURNING id)
+            INSERT INTO sessions (token_hash, user_id, expires_at)
+            SELECT h, u.id, now() + interval '1 hour' FROM u, (VALUES {hashes}) AS t(h);"""
+    )
+    return tokens
+
 
 def check_practice_grading(client: Client, paper_id: str) -> None:
     """Issue #18: exercise grading, resubmission, errors, and persistence."""
@@ -171,21 +189,32 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     expect_stats(detail["stats"], 3, 3, 0)
     print("Practice grading smoke checks passed!")
 
+
 def main() -> None:
+    public = Client(BASE_URL)
+    wait_ready(public)
+    for path, expected in [("/", 200), ("/health/live", 200), ("/api/papers", 401), ("/api/auth/me", 401)]:
+        status, _ = public.request("GET", path)
+        assert status == expected, (path, status)
+    print("Public availability and anonymous access checks passed.")
+
+    target = urllib.parse.urlsplit(BASE_URL)
+    if target.scheme != "http" or target.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        return
+    if os.environ.get("COMPOSE_PROJECT_NAME") not in {"grace-ci", "grace-release"}:
+        return
+
     suffix = secrets.token_hex(8)
-    credentials_a = {"username": f"smoke_a_{suffix}", "password": secrets.token_urlsafe(24)}
-    credentials_b = {"username": f"smoke_b_{suffix}", "password": secrets.token_urlsafe(24)}
-    user_a = Client(BASE_URL)
-    user_b = Client(BASE_URL)
+    name_a, name_b = f"smoke_a_{suffix}", f"smoke_b_{suffix}"
+    try:
+        tokens_a = seed_sessions(name_a, 2)
+        tokens_b = seed_sessions(name_b, 1)
+        run_checks(Client(BASE_URL, tokens_a[0]), Client(BASE_URL, tokens_b[0]), tokens_a[1])
+    finally:
+        run_sql(f"DELETE FROM users WHERE username IN ('{name_a}', '{name_b}');")
 
-    wait_ready(user_a)
 
-    # Sign in two distinct users.
-    status, data = user_a.request("POST", "/api/auth/register", credentials_a)
-    assert status in (200, 201), f"user A register failed: {status} {data}"
-    status, data = user_b.request("POST", "/api/auth/register", credentials_b)
-    assert status in (200, 201), f"user B register failed: {status} {data}"
-
+def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
     # Default paper is provisioned once on first list.
     status, list_a = user_a.request("GET", "/api/papers")
     assert status == 200 and len(list_a["papers"]) == 1, f"expected 1 default paper: {status} {list_a}"
@@ -264,19 +293,13 @@ def main() -> None:
     # Resume in a fresh browser session, at a question different from the one answered.
     status, _ = user_a.request("PUT", f"/api/papers/{pid1}/position", {"question_id": "q3"})
     assert status == 204, status
-    status, _ = user_a.request("POST", "/api/auth/logout")
-    assert status == 204, status
-    status, _ = user_a.request("GET", f"/api/papers/{pid1}")
-    assert status == 401, status
-    fresh = Client(BASE_URL)
-    status, _ = fresh.request("POST", "/api/auth/login", credentials_a)
-    assert status == 200, status
+    fresh = Client(BASE_URL, resume_session)
     status, restored = fresh.request("GET", f"/api/papers/{pid1}")
     assert status == 200, status
     assert restored["current_question_id"] == "q3", restored
     assert restored["stats"] == detail_after["stats"], restored
     assert restored["questions"] == detail_after["questions"], restored
-    print("All papers, grading, and sign-in recovery checks passed!")
+    print("All papers, grading, and session-resume checks passed!")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,72 @@
+# Daily PostgreSQL backup to DigitalOcean Spaces (5:00 AM America/Toronto).
+# Requires existing secrets in the `grace` namespace:
+#   - `grace-db` (`password`)
+#   - `grace-backup-spaces` (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "0 5 * * *"
+  timeZone: "America/Toronto"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: postgres-backup
+        spec:
+          restartPolicy: Never
+          initContainers:
+            - name: pg-dump
+              image: postgres:17
+              command: ["bash", "/scripts/backup.sh", "dump"]
+              env:
+                - { name: PGHOST, value: db }
+                - { name: PGPORT, value: "5432" }
+                - { name: PGDATABASE, value: grace }
+                - { name: PGUSER, value: grace }
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: grace-db
+                      key: password
+                - { name: BACKUP_DIR, value: /backup }
+              volumeMounts:
+                - { name: backup-work, mountPath: /backup }
+                - { name: backup-script, mountPath: /scripts, readOnly: true }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+          containers:
+            - name: spaces-upload
+              image: amazon/aws-cli:2.41.0
+              command: ["bash", "/scripts/backup.sh", "upload"]
+              envFrom:
+                - secretRef:
+                    name: grace-backup-spaces
+              env:
+                - { name: AWS_DEFAULT_REGION, value: tor1 }
+                - { name: AWS_EC2_METADATA_DISABLED, value: "true" }
+                - { name: SPACES_ENDPOINT, value: "https://tor1.digitaloceanspaces.com" }
+                - { name: SPACES_BUCKET, value: grace-postgres-backups }
+                - { name: BACKUP_PREFIX, value: postgres/ }
+                - { name: BACKUP_DIR, value: /backup }
+                - { name: RETENTION_DAYS, value: "7" }
+              volumeMounts:
+                - { name: backup-work, mountPath: /backup }
+                - { name: backup-script, mountPath: /scripts, readOnly: true }
+              resources:
+                requests: { cpu: 50m, memory: 64Mi }
+                limits: { memory: 256Mi }
+          volumes:
+            - name: backup-work
+              emptyDir: {}
+            - name: backup-script
+              configMap:
+                name: backup-script
+                defaultMode: 0555

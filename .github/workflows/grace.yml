@@ -27,6 +27,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
@@ -52,6 +53,10 @@ jobs:
         env:
           DOCKER_DEFAULT_PLATFORM: linux/amd64
         run: |
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            version=$(bash scripts/release-version.sh "$GITHUB_SHA")
+            export GRACE_RELEASE_VERSION="$version"
+          fi
           docker compose up --build -d --wait --wait-timeout 120
           python3 tests/smoke.py http://localhost:8090
           mkdir -p "$RUNNER_TEMP/release/site"

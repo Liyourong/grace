@@ -2,12 +2,7 @@
 set -euo pipefail
 [[ "$GITHUB_REF" == refs/heads/dev && "$GITHUB_EVENT_NAME" == push ]]
 : "${DIGITALOCEAN_ACCESS_TOKEN:?Missing ci-cd-pipeline environment secret}"
-# One release number per first-parent dev commit after the last pre-pipeline commit.
-baseline=bcffa6bb4bb0eaae2827e45d48b82b2bec4eef46
-git merge-base --is-ancestor "$baseline" "$GITHUB_SHA"
-count=$(git rev-list --first-parent --count "$baseline..$GITHUB_SHA")
-(( count > 0 ))
-version="v$((5 + count))"
+version=$(bash scripts/release-version.sh "$GITHUB_SHA")
 k=(kubectl -n grace)
 retry() {
   local attempt
