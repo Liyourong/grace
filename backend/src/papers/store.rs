@@ -1,7 +1,7 @@
 //! SQL for the tables this module owns: `papers`, `questions`.
 //! Every read that starts from a paper filters by owner, so users never see each other's papers.
 
-use deadpool_postgres::Object;
+use deadpool_postgres::{GenericClient, Object};
 use tokio_postgres::{Row, types::Json};
 
 use super::rules::{Choice, Kind, PaperFile};
@@ -98,13 +98,13 @@ pub async fn list(db: &Object, owner_id: i64) -> Result<Vec<PaperRow>> {
 }
 
 /// `None` if the paper does not exist or belongs to someone else.
-pub async fn get(db: &Object, paper_id: i64, owner_id: i64) -> Result<Option<PaperRow>> {
+pub async fn get(db: &impl GenericClient, paper_id: i64, owner_id: i64) -> Result<Option<PaperRow>> {
     let sql = format!("{PAPER_COLUMNS} WHERE p.id = $1 AND p.owner_id = $2 GROUP BY p.id");
     Ok(db.query_opt(&sql, &[&paper_id, &owner_id]).await?.as_ref().map(paper_row))
 }
 
 /// All questions of a paper the owner can see, in order.
-pub async fn questions(db: &Object, paper_id: i64, owner_id: i64) -> Result<Vec<QuestionRow>> {
+pub async fn questions(db: &impl GenericClient, paper_id: i64, owner_id: i64) -> Result<Vec<QuestionRow>> {
     let sql = format!("{QUESTION_COLUMNS} WHERE p.id = $1 AND p.owner_id = $2 ORDER BY q.position");
     Ok(db.query(&sql, &[&paper_id, &owner_id]).await?.iter().map(question_row).collect())
 }

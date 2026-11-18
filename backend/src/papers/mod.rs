@@ -77,12 +77,16 @@ async fn list(State(s): State<AppState>, user: CurrentUser) -> Result<Json<Value
 
 async fn detail(State(s): State<AppState>, user: CurrentUser, Path(paper_id): Path<String>) -> Result<Json<Value>> {
     let paper_id = parse_id(&paper_id)?;
-    let db = s.pool.get().await?;
+    let mut conn = s.pool.get().await?;
+    let db = conn.build_transaction().isolation_level(tokio_postgres::IsolationLevel::RepeatableRead)
+        .read_only(true).start().await?;
     let paper = store::get(&db, paper_id, user.id).await?.ok_or_else(AppError::not_found)?;
     let questions = store::questions(&db, paper_id, user.id).await?;
     let answers = practice::answers(&db, user.id, &paper.question_ids).await?;
     let progress = practice::progress(&db, user.id, &[paper_id]).await?.remove(&paper_id);
 
+    db.commit().await?;
+    let revision = progress.as_ref().map_or(0, |p| p.revision);
     let current = progress
         .and_then(|p| questions.iter().find(|q| q.id == p.question_id))
         .or(questions.first())
@@ -116,6 +120,7 @@ async fn detail(State(s): State<AppState>, user: CurrentUser, Path(paper_id): Pa
         "title": paper.title,
         "description": paper.description,
         "current_question_id": current,
+        "revision": revision,
         "questions": views,
         "stats": Stats::of(questions.len(), answers.values().map(|a| a.is_correct)),
     })))

@@ -33,6 +33,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("0001_init", include_str!("../migrations/0001_init.sql")),
     ("0002_free_usernames", include_str!("../migrations/0002_free_usernames.sql")),
     ("0003_default_paper", include_str!("../migrations/0003_default_paper.sql")),
+    ("0004_progress_revision", include_str!("../migrations/0004_progress_revision.sql")),
 ];
 
 #[tokio::main]

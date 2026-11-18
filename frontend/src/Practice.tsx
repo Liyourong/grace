@@ -47,10 +47,37 @@ export function Practice(props: {
   }
   // Unsubmitted text lives only in this page; it is never saved or restored.
   const [drafts, setDrafts] = useState(() => new Map<string, string>())
-  // Answer and position writes both move the saved position, so send them strictly in click order.
+  // Each load starts a new queue generation. Discard queued actions from an outdated view.
+  const progress = useRef<{ revision: number } | null>(null)
   const queue = useRef<Promise<unknown>>(Promise.resolve())
-  function send<T>(method: string, path: string, body?: unknown) {
-    const next = queue.current.then(() => api<T>(method, path, body))
+  const targetIndex = useRef(0)
+  const [navigating, setNavigating] = useState(false)
+
+  function send<T>(method: "PUT" | "POST", path: string, body?: object) {
+    const view = progress.current
+    const next = queue.current.then(async () => {
+      if (!view || view !== progress.current) return
+      const r = await api<T & { revision?: number }>(method, path, method === "PUT" ? { ...body, expected_revision: view.revision } : body)
+      if (view !== progress.current) return
+      if (r.ok && method === "POST") return r
+      const revision = r.ok ? r.data?.revision : undefined
+      if (typeof revision === "number" && Number.isSafeInteger(revision) && revision === view.revision + 1) {
+        view.revision = revision
+      } else if (r.ok || r.uncertain || r.error.code === "progress_conflict") {
+        progress.current = null
+        clearExplain()
+        const message = !r.ok && r.error.code === "progress_conflict"
+          ? "Progress changed on another device. Your action was not saved. Review the latest position and try again."
+          : "The save could not be confirmed. Review the latest progress before trying again."
+        setWarn({ kind: "warn", message })
+        setFinished(false)
+        setPaper(null)
+        setAttempt((n) => n + 1)
+        onChanged()
+        return
+      }
+      return r
+    })
     queue.current = next
     return next
   }
@@ -60,13 +87,22 @@ export function Practice(props: {
     api<Paper>("GET", base).then((r) => {
       if (cancelled) return
       if (r.ok) {
+        if (!Number.isSafeInteger(r.data.revision)) {
+          setLoadError({ code: "revision_required", message: "Refresh the page to load the current practice version." })
+          return
+        }
+        progress.current = { revision: r.data.revision }
+        targetIndex.current = Math.max(0, r.data.questions.findIndex((q) => q.id === r.data.current_question_id))
         setPaper(r.data)
-        setIndex(Math.max(0, r.data.questions.findIndex((q) => q.id === r.data.current_question_id)))
+        setIndex(targetIndex.current)
+        setNavigating(false)
+        setBusy(false)
       } else if (r.status === 401) onExpired("the paper could not be opened")
       else setLoadError(r.error)
     })
     return () => {
       cancelled = true
+      progress.current = null
       // Also discard a pending explanation when switching papers/unmounting.
       explainRequestId.current += 1
     }
@@ -100,11 +136,21 @@ export function Practice(props: {
 
   async function go(i: number) {
     clearExplain()
-    setIndex(i)
-    setFinished(false)
-    const r = await send("PUT", `${base}/position`, { question_id: questions[i].id })
-    if (r.ok) setWarn(null)
-    else if (r.status === 401) onExpired("your position was not saved")
+    if (i < 0 || i >= questions.length) return
+    targetIndex.current = i
+    setNavigating(true)
+    const request = send("PUT", `${base}/position`, { question_id: questions[i].id })
+    const r = await request
+    if (!r) return
+    if (queue.current === request) {
+      setNavigating(false)
+      if (!r.ok) targetIndex.current = index
+    }
+    if (r.ok) {
+      setIndex(i)
+      setFinished(false)
+      setWarn(null)
+    } else if (r.status === 401) onExpired("your position was not saved")
     else setWarn({ kind: "warn", message: `Your position was not saved: ${r.error.message}` })
   }
 
@@ -112,6 +158,7 @@ export function Practice(props: {
     clearExplain()
     setBusy(true)
     const r = await send<{ answer: Answer; stats: Stats }>("PUT", `${base}/answers/${encodeURIComponent(q.id)}`, payload)
+    if (!r) return
     setBusy(false)
     const num = questions.indexOf(q) + 1
     if (r.ok) {
@@ -127,8 +174,6 @@ export function Practice(props: {
       onChanged()
     } else if (r.status === 401) {
       onExpired(`your answer to question ${num} was not saved`)
-    } else if (r.uncertain) {
-      setWarn({ kind: "error", message: `We couldn't confirm whether your answer to question ${num} was saved. Reopen the paper to check.` })
     } else {
       setWarn({ kind: "error", message: `Your answer to question ${num} was not saved: ${r.error.message}` })
     }
@@ -153,6 +198,7 @@ export function Practice(props: {
   async function finish() {
     clearExplain()
     const r = await send<{ stats: Stats }>("POST", `${base}/finish`)
+    if (!r) return
     if (r.status === 401) return onExpired("the practice could not be finished")
     if (!r.ok) return setWarn({ kind: "error", message: r.error.message })
     const { stats } = r.data
@@ -231,7 +277,7 @@ export function Practice(props: {
                         chosen && (q.answer?.is_correct ? OK : BAD)
                       )}
                       aria-pressed={chosen}
-                      disabled={busy}
+                      disabled={busy || navigating}
                       onClick={() => submit(q, { option_id: o.id })}
                     >
                       <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs text-foreground">
@@ -247,7 +293,7 @@ export function Practice(props: {
                 key={q.id}
                 saved={q.answer?.saved_answer}
                 value={drafts.get(q.id) ?? q.answer?.saved_answer ?? ""}
-                busy={busy}
+                busy={busy || navigating}
                 onDraft={(text) => {
                   clearExplain()
                   setDrafts((previous) => new Map(previous).set(q.id, text))
@@ -260,20 +306,20 @@ export function Practice(props: {
               <Feedback
                 q={q}
                 a={q.answer}
-                busy={busy}
+                busy={busy || navigating}
                 explain={explain?.paperId === paperId && explain.questionId === q.id ? explain : null}
                 onExplain={() => explainSaved(q)}
                 hasUnsavedChanges={hasUnsavedChanges}
               />
             )}
             <div className="flex justify-between">
-              <Button variant="ghost" disabled={index === 0} onClick={() => go(index - 1)}>
+              <Button variant="ghost" disabled={index === 0} onClick={() => go(targetIndex.current - 1)}>
                 <ArrowLeft /> Previous
               </Button>
               {last ? (
-                <Button onClick={finish}>Finish</Button>
+                <Button disabled={navigating} onClick={finish}>Finish</Button>
               ) : (
-                <Button variant="ghost" onClick={() => go(index + 1)}>
+                <Button variant="ghost" onClick={() => go(targetIndex.current + 1)}>
                   Next <ArrowRight />
                 </Button>
               )}
