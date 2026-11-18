@@ -3,7 +3,7 @@ WORKDIR /src
 COPY backend/Cargo.toml backend/Cargo.lock ./
 RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release && rm -rf src
 COPY backend/ ./
-COPY dashboard/app.js dashboard/index.html dashboard/style.css /dashboard/
+COPY dashboard/app.js dashboard/logs.js dashboard/index.html dashboard/style.css /dashboard/
 RUN touch src/main.rs && cargo build --release
 
 FROM node:24-slim AS web

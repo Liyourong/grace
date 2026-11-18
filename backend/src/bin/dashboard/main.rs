@@ -1,6 +1,7 @@
 mod cluster;
 mod load_test;
 mod metrics;
+mod logs;
 
 use axum::{
     Json, Router,
@@ -170,6 +171,12 @@ async fn ingest(
 async fn snapshot(State(s): State<Store>) -> Json<Value> {
     Json(json!(&*s.borrow()))
 }
+fn viewer_state(v: &View) -> Value {
+    json!({"resources":v.resources, "synced":v.synced, "updated":v.updated, "pod_events":v.pod_events})
+}
+async fn viewer_snapshot(State(s): State<Store>) -> Json<Value> {
+    Json(viewer_state(&s.borrow()))
+}
 async fn ready(State(s): State<Store>) -> StatusCode {
     let view = s.borrow();
     if KINDS
@@ -182,17 +189,33 @@ async fn ready(State(s): State<Store>) -> StatusCode {
     }
 }
 async fn events(State(s): State<Store>) -> impl IntoResponse {
+    event_stream(s, false)
+}
+async fn viewer_events(State(s): State<Store>) -> impl IntoResponse {
+    event_stream(s, true)
+}
+fn event_stream(s: Store, viewer: bool) -> impl IntoResponse {
     let rx = s.subscribe();
-    let snapshots = stream::unfold((rx, true), |(mut rx, first)| async move {
+    let snapshots = stream::unfold((rx, true), move |(mut rx, first)| async move {
         if !first && rx.changed().await.is_err() {
             return None;
         }
-        let event = Event::default()
-            .json_data(&*rx.borrow_and_update())
-            .expect("serialize view");
+        let event = {
+            let state = rx.borrow_and_update();
+            if viewer {
+                Event::default().json_data(viewer_state(&state))
+            } else {
+                Event::default().json_data(&*state)
+            }
+            .expect("serialize view")
+        };
         Some((Ok::<_, Infallible>(event), (rx, false)))
     });
-    Sse::new(snapshots).keep_alive(KeepAlive::default())
+    Sse::new(snapshots).keep_alive(
+        KeepAlive::new()
+            .interval(std::time::Duration::from_secs(5))
+            .event(Event::default().event("heartbeat").data("ok")),
+    )
 }
 #[tokio::main]
 async fn main() {
@@ -209,12 +232,9 @@ async fn main() {
     for kind in KINDS {
         tokio::spawn(cluster::observe(kube.clone(), store.clone(), kind));
     }
-    tokio::spawn(cluster::observe_logs(kube, store.clone()));
-    let mut app = Router::new()
-        .route(
-            "/",
-            get(|| async { Html(include_str!("../../../../dashboard/index.html")) }),
-        )
+    let logs = logs::Logs::default();
+    tokio::spawn(cluster::observe_logs(kube, store.clone(), logs.clone()));
+    let assets = Router::new()
         .route(
             "/app.js",
             get(|| async {
@@ -232,7 +252,25 @@ async fn main() {
                     include_str!("../../../../dashboard/style.css"),
                 )
             }),
+        );
+    const PAGE: &str = include_str!("../../../../dashboard/index.html");
+    let viewer = assets
+        .clone()
+        .route(
+            "/",
+            get(|| async {
+                Html(PAGE.replace("<html lang=\"en\">", "<html lang=\"en\" data-viewer>"))
+            }),
         )
+        .route("/api/events", get(viewer_events))
+        .route("/api/snapshot", get(viewer_snapshot))
+        .route("/api/metrics", get(metrics::viewer_ranges))
+        .with_state(store.clone());
+    let mut app = assets.merge(logs::router(logs))
+        .route("/logs.js", get(|| async {
+            ([("content-type","application/javascript")], include_str!("../../../../dashboard/logs.js"))
+        }))
+        .route("/", get(|| async { Html(PAGE) }))
         .route("/health/ready", get(ready))
         .route("/api/snapshot", get(snapshot))
         .route("/api/events", get(events))
@@ -253,7 +291,9 @@ async fn main() {
     let write = tokio::net::TcpListener::bind("127.0.0.1:9091")
         .await
         .unwrap();
+    let public = tokio::net::TcpListener::bind("0.0.0.0:9092").await.unwrap();
     tokio::try_join!(
+        axum::serve(public, viewer).into_future(),
         axum::serve(
             read,
             app.into_make_service_with_connect_info::<std::net::SocketAddr>()
@@ -266,6 +306,18 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn public_snapshot_contains_only_cluster_activity() {
+        let view = View {
+            load_test: Some(load_test::Test::default()),
+            ..View::default()
+        };
+        let public = viewer_state(&view);
+        assert_eq!(public.as_object().unwrap().len(), 4);
+        for field in ["resources", "updated", "synced", "pod_events"] {
+            assert!(public.get(field).is_some());
+        }
+    }
     #[tokio::test]
     async fn readiness_requires_all_cluster_feeds() {
         let store = Arc::new(watch::channel(View::default()).0);

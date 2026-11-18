@@ -120,6 +120,10 @@ jobs:
         with:
           no_auth: 'true'
           version: '2.1.0'
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        if: steps.head.outputs.current == 'true'
+        with:
+          version: v3.19.0
       - name: Authenticate, publish and verify the DOKS release
         if: steps.head.outputs.current == 'true'
         env:

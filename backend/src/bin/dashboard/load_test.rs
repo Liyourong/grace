@@ -132,10 +132,23 @@ pub async fn control(
         .unwrap_or("");
     let origin = headers.get("origin").and_then(|h| h.to_str().ok());
     if !peer.ip().is_loopback()
-        || !matches!(host, "localhost:9090" | "127.0.0.1:9090" | "[::1]:9090")
+        || !matches!(
+            host,
+            "localhost:9090"
+                | "127.0.0.1:9090"
+                | "[::1]:9090"
+                | "localhost:19090"
+                | "127.0.0.1:19090"
+                | "[::1]:19090"
+        )
         || origin != Some(format!("http://{host}").as_str())
     {
         return StatusCode::FORBIDDEN;
+    }
+    if let Ok(verifier) = std::env::var("GRACE_PRESENTER_SHA256") {
+        if !super::logs::valid_key(&headers, &verifier) {
+            return StatusCode::UNAUTHORIZED;
+        }
     }
     let mut status = StatusCode::OK;
     s.send_modify(|v| status = change(v, cmd, now()));
@@ -146,6 +159,63 @@ pub async fn control(
 mod tests {
     use super::*;
     use serde_json::json;
+    #[tokio::test]
+    async fn load_control_accepts_only_same_origin_loopback_forwards() {
+        let store = std::sync::Arc::new(
+            tokio::sync::watch::channel(View {
+                load_test: Some(Test::default()),
+                ..View::default()
+            })
+            .0,
+        );
+        for (peer, host, origin, expected) in [
+            (
+                "127.0.0.1:4321",
+                "127.0.0.1:19090",
+                "http://127.0.0.1:19090",
+                StatusCode::OK,
+            ),
+            (
+                "[::1]:4321",
+                "localhost:9090",
+                "http://localhost:9090",
+                StatusCode::OK,
+            ),
+            (
+                "127.0.0.1:4321",
+                "localhost:19090",
+                "http://localhost:9090",
+                StatusCode::FORBIDDEN,
+            ),
+            (
+                "127.0.0.1:4321",
+                "example.org:19090",
+                "http://example.org:19090",
+                StatusCode::FORBIDDEN,
+            ),
+            (
+                "10.0.0.1:4321",
+                "127.0.0.1:19090",
+                "http://127.0.0.1:19090",
+                StatusCode::FORBIDDEN,
+            ),
+        ] {
+            let mut headers = HeaderMap::new();
+            headers.insert("host", host.parse().unwrap());
+            headers.insert("origin", origin.parse().unwrap());
+            assert_eq!(
+                control(
+                    State(store.clone()),
+                    ConnectInfo(peer.parse().unwrap()),
+                    headers,
+                    Json(Command::Stop)
+                )
+                .await,
+                expected
+            );
+        }
+    }
+
     #[test]
     fn target_timeout_and_repeat_click() {
         let mut v = View {

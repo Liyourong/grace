@@ -4,3 +4,16 @@
     lb_try_duration 5s
   }
 }
+
+status.{$SITE_HOST} {
+  @viewer {
+    method GET HEAD
+    path / /app.js /style.css /api/events /api/snapshot /api/metrics
+  }
+  handle @viewer {
+    reverse_proxy grace-dashboard:9092
+  }
+  handle {
+    respond 403
+  }
+}

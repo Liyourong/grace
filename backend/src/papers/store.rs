@@ -12,6 +12,8 @@ pub struct PaperRow {
     pub title: String,
     pub description: Option<String>,
     pub uploaded_at: String,
+    pub is_default: bool,
+    pub folder_id: Option<i64>,
     /// Database ids of the paper's questions, in order.
     pub question_ids: Vec<i64>,
 }
@@ -32,38 +34,52 @@ pub struct QuestionRow {
     pub explanation: String,
 }
 
-const PAPER_COLUMNS: &str = "SELECT p.id, p.title, p.description, utc_iso(p.created_at), COALESCE(array_agg(q.id ORDER BY q.position) FILTER (WHERE q.id IS NOT NULL), '{}')
+const PAPER_COLUMNS: &str = "SELECT p.id, p.title, p.description, utc_iso(p.created_at), COALESCE(array_agg(q.id ORDER BY q.position) FILTER (WHERE q.id IS NOT NULL), '{}'), p.folder_id, p.is_default
      FROM papers p LEFT JOIN questions q ON q.paper_id = p.id";
 
 const QUESTION_COLUMNS: &str = "SELECT q.id, q.local_id, q.position, q.kind, q.prompt, q.options, q.correct_option_id, q.accepted_answers, q.correct_answer, q.explanation
      FROM questions q JOIN papers p ON p.id = q.paper_id";
 
 pub async fn insert(db: &mut Object, owner_id: i64, paper: &PaperFile) -> Result<i64> {
-    Ok(insert_paper(db, owner_id, paper, false).await?.expect("only default papers can conflict"))
+    let tx = db.transaction().await?;
+    let id = insert_paper(&tx, owner_id, paper, false).await?;
+    tx.commit().await?;
+    Ok(id)
 }
 
-/// Gives the owner the built-in paper unless they already have it.
-pub async fn ensure_default(db: &mut Object, owner_id: i64, paper: &PaperFile) -> Result<()> {
-    let has = db.query_opt("SELECT 1 FROM papers WHERE owner_id = $1 AND is_default", &[&owner_id]).await?;
-    if has.is_none() {
-        insert_paper(db, owner_id, paper, true).await?;
+pub async fn deliver_starters(db: &mut Object, owner_id: i64) -> Result<()> {
+    let catalog = super::rules::starters();
+    let delivered = db.query("SELECT slot FROM starter_deliveries WHERE owner_id=$1", &[&owner_id]).await?;
+    let missing: Vec<_> = catalog.iter().filter(|(slot, _)| {
+        !delivered.iter().any(|row| row.get::<_, i16>(0) == *slot)
+    }).collect();
+    if missing.is_empty() { return Ok(()); }
+
+    let tx = db.transaction().await?;
+    for (slot, paper) in missing {
+        let claimed = tx.execute(
+            "INSERT INTO starter_deliveries (owner_id,slot) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+            &[&owner_id, slot],
+        ).await?;
+        if claimed == 1 {
+            let id = insert_paper(&tx, owner_id, paper, *slot == 1).await?;
+            tx.execute("UPDATE starter_deliveries SET paper_id=$3 WHERE owner_id=$1 AND slot=$2",
+                &[&owner_id, slot, &id]).await?;
+        }
     }
+    tx.commit().await?;
     Ok(())
 }
 
-/// The paper and all its questions commit together, or nothing is saved.
-/// `None` if this was a default paper and a concurrent request already created it.
-async fn insert_paper(db: &mut Object, owner_id: i64, paper: &PaperFile, is_default: bool) -> Result<Option<i64>> {
-    let tx = db.transaction().await?;
-    let Some(row) = tx
-        .query_opt(
-            "INSERT INTO papers (owner_id, format_version, title, description, is_default) VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (owner_id) WHERE is_default DO NOTHING RETURNING id",
-            &[&owner_id, &paper.format_version, &paper.title, &paper.description, &is_default],
-        )
-        .await?
-    else {
-        return Ok(None);
+async fn insert_paper(tx: &deadpool_postgres::Transaction<'_>, owner_id: i64, paper: &PaperFile, is_default: bool) -> Result<i64> {
+    let row = tx.query_opt(
+        "INSERT INTO papers (owner_id, format_version, title, description, is_default) VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (owner_id) WHERE is_default DO NOTHING RETURNING id",
+        &[&owner_id, &paper.format_version, &paper.title, &paper.description, &is_default],
+    ).await?;
+    let Some(row) = row else {
+        // An older app replica can still issue French Basics during a rolling upgrade.
+        return Ok(tx.query_one("SELECT id FROM papers WHERE owner_id=$1 AND is_default", &[&owner_id]).await?.get(0));
     };
     let paper_id: i64 = row.get(0);
     let insert = tx
@@ -87,13 +103,12 @@ async fn insert_paper(db: &mut Object, owner_id: i64, paper: &PaperFile, is_defa
         )
         .await?;
     }
-    tx.commit().await?;
-    Ok(Some(paper_id))
+    Ok(paper_id)
 }
 
 /// The owner's papers, newest first.
-pub async fn list(db: &Object, owner_id: i64) -> Result<Vec<PaperRow>> {
-    let sql = format!("{PAPER_COLUMNS} WHERE p.owner_id = $1 GROUP BY p.id ORDER BY p.created_at DESC, p.id DESC");
+pub async fn list(db: &impl GenericClient, owner_id: i64) -> Result<Vec<PaperRow>> {
+    let sql = format!("{PAPER_COLUMNS} LEFT JOIN starter_deliveries d ON d.paper_id=p.id WHERE p.owner_id = $1 GROUP BY p.id, d.slot ORDER BY d.slot NULLS FIRST, p.created_at DESC, p.id DESC");
     Ok(db.query(&sql, &[&owner_id]).await?.iter().map(paper_row).collect())
 }
 
@@ -122,6 +137,8 @@ fn paper_row(r: &Row) -> PaperRow {
         description: r.get(2),
         uploaded_at: r.get(3),
         question_ids: r.get(4),
+        folder_id: r.get(5),
+        is_default: r.get(6),
     }
 }
 

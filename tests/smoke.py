@@ -226,11 +226,33 @@ def main() -> None:
 
 
 def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
-    # Default paper is provisioned once on first list.
-    status, list_a = user_a.request("GET", "/api/papers")
-    assert status == 200 and len(list_a["papers"]) == 1, f"expected 1 default paper: {status} {list_a}"
-    status, list_a_again = user_a.request("GET", "/api/papers")
-    assert status == 200 and len(list_a_again["papers"]) == 1, f"default paper duplicated: {list_a_again}"
+    # Two simultaneous first visits must receive the same six completed papers.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first, second = pool.map(lambda client: client.request("GET", "/api/papers"),
+                                 [user_a, Client(BASE_URL, resume_session)])
+    assert first == second and first[0] == 200, (first, second)
+    starters = first[1]["papers"]
+    assert [p["title"] for p in starters] == [
+        "French Basics", "Basic Sentences", "Questions", "Simple Subordinate Clauses",
+        "Relative Clauses", "Complex Sentences",
+    ]
+    assert [p["stats"]["total"] for p in starters] == [3, 10, 10, 10, 10, 10]
+    assert not first[1]["folders"] and all(p["folder_id"] is None for p in starters)
+
+    assert first[1]["study_seconds"] == 0
+    assert [p["current_question_number"] for p in starters] == [1] * 6
+    assert [p["title"] for p in starters if p["is_default"]] == ["French Basics"]
+    end = time.time_ns() // 1_000_000
+    span = {"start_ms": end - 20_000, "end_ms": end - 5_000}
+    route = "/api/practice/time"
+    assert Client(BASE_URL).request("POST", route, span)[0] == 401
+    other = {"start_ms": end - 10_000, "end_ms": end}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        assert all(r[0] == 204 for r in pool.map(lambda body: user_a.request("POST", route, body), [other, span, span]))
+    assert user_a.request("GET", "/api/papers")[1]["study_seconds"] == 20
+    assert user_b.request("GET", "/api/papers")[1]["study_seconds"] == 0
+    for bad in [dict(span, end_ms=end-100_000), dict(span, end_ms=end+60_000), dict(span, start_ms=end-90_000)]:
+        assert user_a.request("POST", route, bad)[0] == 400
 
     # 1. Invalid upload returns 400 with at least three details.
     invalid_paper = json.loads((ROOT / "examples" / "invalid-paper.json").read_text(encoding="utf-8"))
@@ -328,6 +350,34 @@ def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
     assert restored["current_question_id"] == "q3", restored
     assert restored["stats"] == detail_after["stats"], restored
     assert restored["questions"] == detail_after["questions"], restored
+    # Moves and deletion stay inside the account and preserve the practice record.
+    status, folder = user_a.request("POST", "/api/folders", {"name": "Grammar"})
+    assert status == 201
+    fid = folder["id"]
+    folder_url = "/api/folders/" + fid
+    assert user_b.request("GET", "/api/papers")[1]["folders"] == []
+    foreign_paper = user_b.request("GET", "/api/papers")[1]["papers"][0]["id"]
+    assert user_b.request("PATCH", "/api/papers/" + foreign_paper, {"folder_id": fid})[0] == 404
+    assert user_b.request("PATCH", base, {"folder_id": None})[0] == 404
+    assert user_b.request("DELETE", base)[0] == 404
+    assert user_b.request("PATCH", folder_url, {"name": "Other"})[0] == 404
+    assert user_b.request("DELETE", folder_url)[0] == 404
+    assert user_a.request("PATCH", folder_url, {"name": "Review"})[0] == 204
+    assert user_a.request("PATCH", base, {"folder_id": fid})[0] == 204
+    assert fresh.request("GET", base)[1] == restored
+    assert user_a.request("DELETE", folder_url)[0] == 204
+    library = fresh.request("GET", "/api/papers")[1]
+    assert next(p for p in library["papers"] if p["id"] == pid1)["current_question_number"] == 3
+    assert not library["folders"] and next(p for p in library["papers"] if p["id"] == pid1)["folder_id"] is None
+    assert fresh.request("GET", base)[1] == restored
+    assert user_a.request("DELETE", base)[0] == 204
+    assert fresh.request("GET", base)[0] == 404
+    for starter in starters:
+        assert user_a.request("DELETE", "/api/papers/" + starter["id"])[0] == 204
+    library = fresh.request("GET", "/api/papers")[1]
+    assert library["study_seconds"] == 20
+    assert {p["id"] for p in library["papers"]} == {pid2, forged_id}
+    assert len(user_b.request("GET", "/api/papers")[1]["papers"]) == 6
     print("All papers, grading, and session-resume checks passed!")
 
 

@@ -56,13 +56,24 @@ impl AppError {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct RejectionStage(pub &'static str);
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let mut error = json!({ "code": self.code, "message": self.message });
         if !self.details.is_empty() {
             error["details"] = json!(self.details);
         }
-        (self.status, Json(json!({ "error": error }))).into_response()
+        let mut response = (self.status, Json(json!({ "error": error }))).into_response();
+        let stage = match self.code {
+            "origin_not_allowed" => Some("Origin check"),
+            "invalid_json" | "unsupported_media_type" | "file_too_large" => Some("Request body"),
+            "invalid_credentials" => Some("Credential validation"),
+            _ => None,
+        };
+        if let Some(stage) = stage { response.extensions_mut().insert(RejectionStage(stage)); }
+        response
     }
 }
 

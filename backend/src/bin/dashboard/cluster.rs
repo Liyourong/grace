@@ -234,7 +234,7 @@ pub async fn observe(k: Kube, s: Store, kind: &'static str) {
         }
     }
 }
-async fn log_tail(k: Kube, s: Store, pod: String) {
+async fn log_tail(k: Kube, s: Store, pod: String, logs: super::logs::Logs) {
     let path = format!("/api/v1/namespaces/grace/pods/{pod}/log");
     loop {
         if let Ok(resp) = k
@@ -253,6 +253,10 @@ async fn log_tail(k: Kube, s: Store, pod: String) {
                 let Ok(v) = serde_json::from_slice::<Value>(line) else {
                     return Ok(());
                 };
+                if v["event"] == "grace.request" {
+                    logs.ingest(&pod, v);
+                    return Ok(());
+                }
                 if v["event"] != "grace.demo.login" {
                     return Ok(());
                 }
@@ -278,7 +282,7 @@ async fn log_tail(k: Kube, s: Store, pod: String) {
         sleep(Duration::from_secs(1)).await;
     }
 }
-pub async fn observe_logs(k: Kube, s: Store) {
+pub async fn observe_logs(k: Kube, s: Store, logs: super::logs::Logs) {
     let mut rx = s.subscribe();
     let mut tasks: HashMap<String, JoinHandle<()>> = HashMap::new();
     loop {
@@ -302,7 +306,7 @@ pub async fn observe_logs(k: Kube, s: Store) {
         for pod in pods {
             tasks
                 .entry(pod.clone())
-                .or_insert_with(|| tokio::spawn(log_tail(k.clone(), s.clone(), pod)));
+                .or_insert_with(|| tokio::spawn(log_tail(k.clone(), s.clone(), pod, logs.clone())));
         }
         if rx.changed().await.is_err() {
             break;

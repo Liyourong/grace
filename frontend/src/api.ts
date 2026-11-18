@@ -1,11 +1,16 @@
 export type ApiError = { code: string; message: string; details?: string[] }
 export type ApiResult<T> =
-  | { ok: true; status: number; data: T }
+  | { ok: true; status: number; data: T; serverDate: string | null }
   | { ok: false; status: number; error: ApiError; uncertain: boolean }
 
 export type User = { username: string }
 export type Stats = { total: number; answered: number; correct: number; incorrect: number; unanswered: number }
+export type FolderSummary = { id: string; name: string }
+export type Library = { folders: FolderSummary[]; papers: PaperSummary[]; study_seconds: number }
 export type PaperSummary = {
+  current_question_number: number
+  is_default: boolean
+  folder_id: string | null
   id: string
   title: string
   uploaded_at: string
@@ -49,7 +54,7 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
   } catch {
     /* 204 or a non-JSON proxy page */
   }
-  if (res.ok) return { ok: true, status: res.status, data }
+  if (res.ok) return { ok: true, status: res.status, data, serverDate: res.headers.get("Date") }
   const error = data?.error ?? { code: `http_${res.status}`, message: `Request failed (HTTP ${res.status})` }
   return { ok: false, status: res.status, error, uncertain: res.status >= 500 }
 }

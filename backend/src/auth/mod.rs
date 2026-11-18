@@ -21,6 +21,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::task::spawn_blocking;
 
+use crate::observation::step;
 use crate::common::{AppError, AppState, Body, Result};
 
 /// Creates this module's own tables. Call once at start-up, after the shared migrations (it references `users`).
@@ -48,11 +49,13 @@ impl FromRequestParts<AppState> for CurrentUser {
     type Rejection = AppError;
 
     async fn from_request_parts(parts: &mut Parts, s: &AppState) -> Result<Self> {
-        let token = rules::session_token(&parts.headers).ok_or_else(AppError::unauthorized)?;
-        let (id, username) = store::session_user(&s.pool.get().await?, &rules::hash_token(token))
-            .await?
-            .ok_or_else(AppError::unauthorized)?;
-        Ok(Self { id, username })
+        step("Session check", async {
+            let token = rules::session_token(&parts.headers).ok_or_else(AppError::unauthorized)?;
+            let (id, username) = store::session_user(&s.pool.get().await?, &rules::hash_token(token))
+                .await?
+                .ok_or_else(AppError::unauthorized)?;
+            Ok(Self { id, username })
+        }).await
     }
 }
 
@@ -244,18 +247,23 @@ async fn login(State(s): State<AppState>, Body(c): Body<Credentials>) -> Result<
     let (Some(username), true) = (rules::username(&c.username), rules::password_ok(&c.password)) else {
         return Err(invalid_credentials());
     };
-    let mut db = s.pool.get().await?;
-    let account = store::credentials(&db, &username).await?;
+    let (mut db, account) = step("Account lookup", async {
+        let db = s.pool.get().await?;
+        let account = store::credentials(&db, &username).await?;
+        Ok((db, account))
+    }).await?;
     let (user_id, stored_hash) = match &account {
         Some((id, hash)) => (Some(*id), hash.clone()),
         None => (None, rules::dummy_hash().to_string()), // same work as a real check, so timing does not give names away
     };
     let password = c.password;
-    let matches = blocking(move || rules::verify_password(&password, &stored_hash)).await?;
-    let Some(user_id) = user_id.filter(|_| matches) else { return Err(invalid_credentials()) };
+    let user_id = step("Password check", async {
+        let matches = blocking(move || rules::verify_password(&password, &stored_hash)).await?;
+        user_id.filter(|_| matches).ok_or_else(invalid_credentials)
+    }).await?;
 
     let (token, token_hash) = rules::new_token();
-    store::login_session(&mut db, user_id, &token_hash).await?;
+    step("Session creation", store::login_session(&mut db, user_id, &token_hash)).await?;
     Ok(([(SET_COOKIE, rules::session_cookie(&token, s.cookie_secure))], user_json(&username)).into_response())
 }
 

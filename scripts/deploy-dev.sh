@@ -124,3 +124,10 @@ done
 retry python3 tests/check_site.py "$base" "$site"
 python3 tests/smoke.py "$base"
 echo "Verified $version at $base (health, assets and business checks)." >> "$GITHUB_STEP_SUMMARY"
+
+# A monitoring failure must fail the release check without reverting the verified learner app.
+trap - ERR
+check_head
+context=$(kubectl config current-context)
+bash scripts/deploy-doks-monitoring.sh "$context"
+echo "Verified the Dashboard Service, topology readiness and Pod traffic for $version." >> "$GITHUB_STEP_SUMMARY"

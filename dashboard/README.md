@@ -1,6 +1,6 @@
 # Grace operations dashboard
 
-The dashboard runs in its own Pod in the Grace cluster. Open the dashboard on the presenter's computer. The browser receives live Kubernetes snapshots and login completions. The test client sends its requests through the normal Grace entry point.
+The dashboard runs in its own Pod in the Grace cluster. Open the dashboard on the presenter's computer. The browser receives live Kubernetes snapshots and login completions. On an idle stream the server sends a heartbeat every five seconds. **Last contact** shows when this browser last received a snapshot or heartbeat. Hover over it for the last Kubernetes sync. The test client sends its requests through the normal Grace entry point.
 
 ## Open the dashboard
 
@@ -13,11 +13,36 @@ kubectl --context "$CTX" -n grace port-forward deployment/grace-dashboard 9090:9
 
 Open **http://localhost:9090**. Leave the terminal running. Port 9090 serves the page. Port 9091 accepts timings only on the Pod's loopback interface. Forward both ports to the same Pod. If Kubernetes replaces the dashboard Pod, restart the forward. A browser refresh restores the running Pod's latest batch.
 
+## Private request logs and traces
+
+Open **Logs** on the presenter console at **http://127.0.0.1:19090/#logs-view** after unlocking the browser. It refreshes every two seconds while visible. Filter the most recent 500 business requests by Pod, HTTP status or Trace ID. Select a request to see timing from the Grace app. Login and answer submissions include measured steps. A failed step marks where processing stopped. The application also returns the ID in the `X-Trace-Id` response header.
+
+The Dashboard holds this history in memory across app Pod replacements. A Dashboard restart can lose older entries. The private APIs require the loopback forward and presenter key even with CPU rehearsal disabled. The public site has no logs or trace endpoints.
+
+## Public viewer and private presenter
+
+Share **https://status.146-190-191-107.sslip.io/** with viewers. Caddy forwards only the static page, cluster snapshots, event stream and charts to a separate read-only listener on port 9092. Prometheus queries for the viewer are shared across viewers for each 15-second sample. The viewer excludes login traces, presenter probes and load controls.
+
+On DOKS the presenter uses the loopback port-forward on 19090 and a personal key. Open your private presenter link once per browser. The fragment stays on your computer, is removed from the address bar, and the browser remembers the key for this origin. Kubernetes stores only its SHA-256 verifier. Keep the presenter file private. To provision a new presenter on a fresh cluster, run the following on the presenter's Mac before enabling demo mode:
+
+```bash
+(
+  set -eu
+  umask 077
+  file=$(mktemp "$HOME/Downloads/Grace-presenter-XXXXXX")
+  key=$(openssl rand -hex 32)
+  printf 'http://127.0.0.1:19090/#presenter=%s\n' "$key" > "$file"
+  verifier=$(printf %s "$key" | shasum -a 256 | cut -d' ' -f1)
+  kubectl --context do-tor1-grace -n grace create configmap grace-dashboard-presenter --from-literal=sha256="$verifier"
+  echo "Private presenter link saved in $file"
+)
+```
+
 ## One-click HPA test
 
 On the **Topology** tab click **Start load test**. Each Grace app Pod runs a fixed 300 ms CPU sample followed by a 700 ms pause. The dashboard stops issuing samples when five replicas are available, after three minutes, or when you click **Stop load test**. Closing the tab leaves the server-side time limit in effect. Watch the node boxes for new Pods and the **Metrics** view for replica counts. After Kubernetes scales back down you can run the test again.
 
-The install script enables this control for the local `grace-dash-demo` profile by default. On DOKS, an operator can enable it for a rehearsal as described below. Open the dashboard through its localhost port-forward on port 9090. Both the app and dashboard must use the image that includes the CPU test. The button exercises CPU-based autoscaling independently of the login timeline.
+The install script enables this control for the local `grace-dash-demo` profile by default. On DOKS, an operator can enable it for a rehearsal as described below. Open the dashboard through its localhost port-forward on port 9090 (minikube) or 19090 (DOKS). Both the app and dashboard must use the image that includes the CPU test. The button exercises CPU-based autoscaling independently of the login timeline.
 
 The right-hand **Live traffic** panel shows total inbound and outbound bandwidth on the Grace application Pods’ non-loopback network interfaces, including traffic to PostgreSQL and monitoring traffic. The chart covers five minutes and polls every 15 seconds. Each rate uses the last two available cAdvisor counter samples. **Pod activity** keeps the latest 100 observed creations and deletions for the app, Caddy and database Pods. The initial inventory is a baseline. Refreshing or reconnecting restores recent events from the dashboard, and the browser keeps notifications it has already received across dashboard restarts. Changes that occur entirely while the watcher is offline can be missed.
 
@@ -81,13 +106,11 @@ helm upgrade --install grace-monitor prometheus --repo https://prometheus-commun
 bash scripts/dashboard-deploy.sh "$CTX"
 ```
 
-For DOKS, release the instrumented Grace image using the team's normal release process first. Use the real DOKS context for both commands. The DOKS installation uses only the shared values file.
+On DOKS, the dev release job installs or updates Prometheus and the Dashboard after the Grace app passes its public health and business checks. A monitoring failure fails the job and leaves the verified learner app running. To install or retry monitoring independently, run the same command from the repository root with Helm 3, kubectl and jq:
 
 ```bash
 CTX=do-tor1-grace
-helm upgrade --install grace-monitor prometheus --repo https://prometheus-community.github.io/helm-charts \
-  --version 29.47.2 --kube-context "$CTX" -n grace -f k8s/monitoring/prometheus-values.yaml
-bash scripts/dashboard-deploy.sh "$CTX"
+bash scripts/deploy-doks-monitoring.sh "$CTX"
 ```
 
 The script waits for the app rollout and uses the released image and the registry pull-secret references from a Ready app Pod. The Dashboard uses its own read-only Kubernetes role. Installation checks topology readiness and current inbound and outbound network samples through the Dashboard Service. Allow two Prometheus scrapes after installation. If the traffic check fails, inspect the `kubernetes-nodes-cadvisor` scrape targets and the `container_network_receive_bytes_total` and `container_network_transmit_bytes_total` series for the Grace app Pods, then rerun the installer. The deployer needs permission to read `services/proxy` in the Grace namespace for these checks.
@@ -95,12 +118,12 @@ The script waits for the app rollout and uses the released image and the registr
 After installation, team members with Pod port-forward access can view the private ClusterIP Service from their own computer:
 
 ```bash
-kubectl --context "$CTX" -n grace port-forward svc/grace-dashboard 9090:9090
+kubectl --context "$CTX" -n grace port-forward svc/grace-dashboard 19090:9090
 ```
 
-Open **http://127.0.0.1:9090**. Use the two-port Deployment forward in **Open the dashboard** when also sending login results or presenter probes.
+Open **http://127.0.0.1:19090**. Keep the terminal open. Reconnect the forward when a release replaces the Dashboard Pod. Use the two-port Deployment forward in **Open the dashboard** when also sending login results or presenter probes.
 
-For a scheduled DOKS rehearsal, run `bash scripts/dashboard-deploy.sh "$CTX" --enable-hpa-demo` and use the same local URL. This enables bounded CPU load on the application Pods when the presenter clicks the button. Changing demo mode rolls the app Pods. After the rehearsal run `bash scripts/dashboard-deploy.sh "$CTX"` to return to monitoring-only mode. Normal application releases and rollbacks also require rerunning the installer to align the Dashboard image with Grace.
+For a scheduled DOKS rehearsal, run `bash scripts/dashboard-deploy.sh "$CTX" --enable-hpa-demo` and reconnect the Service forward on port 19090 after the rollout. Click **Start load test** on the same page. This enables bounded CPU load on the application Pods when the presenter clicks the button. Changing demo mode rolls the app Pods. After the rehearsal run `bash scripts/dashboard-deploy.sh "$CTX"` to return to monitoring-only mode. Subsequent dev releases preserve the current rehearsal setting. After a manual app rollback, rerun the installer to align the Dashboard image with Grace.
 To link a specific existing DigitalOcean Uptime check, set `UPTIME_URL` on the dashboard Deployment to its DigitalOcean console URL.
 
 ## Read the signals

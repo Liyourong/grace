@@ -694,3 +694,19 @@ footer {
 #podEvents .deleted { color: #e0b481; }
 #podEvents code { grid-column: 1/-1; font: 11px var(--mono); overflow-wrap: anywhere; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+html[data-viewer] :is(.toolbar nav, #loadTest, .resourcehead a, .key span:last-child, .inspector .activity ~ *) { display: none; }
+
+.log-filters, .trace-detail, #logMessage { padding: 10px 16px; }
+.log-filters { display: flex; flex-wrap: wrap; gap: 10px; }
+.log-filters label { display: grid; gap: 4px; color: var(--muted); }
+.log-filters input, .log-filters select { background: var(--panel); color: inherit; border: 1px solid var(--line); padding: 5px; }
+.log-scroll { overflow: auto; max-height: 45vh; }
+.log-scroll table { border-collapse: collapse; width: 100%; font: 11px var(--mono); }
+.log-scroll :is(td, th) { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.log-scroll button { color: inherit; background: transparent; border: none; text-align: left; font: inherit; cursor: pointer; }
+.log-scroll .selected { background: #293b53; }
+.trace-detail { overflow-wrap: anywhere; }
+.trace-detail h2 { margin-bottom: 8px; }
+.trace-detail ol { padding-left: 20px; line-height: 1.8; }
+.trace-detail .failed { color: #e398a1; }

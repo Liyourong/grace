@@ -29,10 +29,13 @@ resources: [monitoring]
 patches:
   - path: dashboard-patch.json
 YAML
-jq -n --arg image "$image" --argjson secrets "$pull_secrets" --argjson demo "$demo" '
+jq -n --arg image "$image" --argjson secrets "$pull_secrets" --argjson demo "$demo" --arg context "$context" '
   {apiVersion:"apps/v1",kind:"Deployment",metadata:{name:"grace-dashboard",namespace:"grace"},
    spec:{template:{spec:{imagePullSecrets:$secrets,containers:[{name:"dashboard",image:$image,
-     env:[{name:"GRACE_HPA_DEMO",value:(if $demo then "1" else "0" end)}]}]}}}}' > "$dir/dashboard-patch.json"
+     env:([{name:"GRACE_HPA_DEMO",value:(if $demo then "1" else "0" end)}] +
+       (if $context != "grace-dash-demo" then
+          [{name:"GRACE_PRESENTER_SHA256",valueFrom:{configMapKeyRef:{name:"grace-dashboard-presenter",key:"sha256",optional:($demo|not)}}}]
+        else [] end))}]}}}}' > "$dir/dashboard-patch.json"
 "${k[@]}" apply -k "$dir"
 "${k[@]}" rollout status deployment/grace-dashboard --timeout=180s
 

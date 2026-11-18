@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { FileJson, LogOut, Monitor, Moon, Plus, Sun, Upload } from "lucide-react"
+import { FileJson, LayoutDashboard, LibraryBig, LogOut, Monitor, Moon, Plus, Sun, Upload } from "lucide-react"
 
-import { api, type ApiError, type PaperSummary, type User } from "@/api"
+import { api, type ApiError, type Library, type User } from "@/api"
 import { Notice } from "@/components/notice"
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { PaperLibrary } from "@/PaperLibrary"
+import { Overview } from "@/Overview"
+import { flushStudyTime } from "@/useStudyTime"
 import { Practice } from "@/Practice"
 
 const appName = import.meta.env.VITE_GRACE_VERSION ? `Grace ${import.meta.env.VITE_GRACE_VERSION}` : "Grace"
-
-const fmtTime = (iso: string) => new Date(iso).toLocaleString()
-// Same-title papers are distinct uploads; the upload time tells them apart in the sidebar.
-const shortTime = (iso: string) =>
-  new Date(iso).toLocaleString([], { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
 
 const THEMES = {
   system: { icon: Monitor, label: "System", next: "light" },
@@ -59,6 +57,7 @@ export default function App() {
     []
   )
   const logout = useCallback(async () => {
+    await flushStudyTime()
     const r = await api("POST", "/api/auth/logout")
     if (!r.ok && r.status !== 401) return alert(`Sign-out failed; you are still signed in: ${r.error.message}`)
     setView({ name: "auth" })
@@ -171,7 +170,7 @@ function Auth({ message, onDone }: { message?: string; onDone: (user: User) => v
         <div aria-hidden className="mx-auto mb-2 flex size-10 items-center justify-center rounded-lg bg-primary font-semibold text-primary-foreground">
           G
         </div>
-        <CardTitle className="text-xl">
+        <CardTitle className="text-2xl leading-tight font-medium tracking-tight">
           <h1>{verifying ? "Check your email" : isLogin ? "Welcome back" : "Create your account"}</h1>
         </CardTitle>
         <CardDescription>
@@ -310,9 +309,16 @@ function Auth({ message, onDone }: { message?: string; onDone: (user: User) => v
 
 function Shell(props: { user: User; onLogout: () => void; onExpired: (what: string) => void }) {
   const { user, onLogout, onExpired } = props
-  const [papers, setPapers] = useState<PaperSummary[] | null>(null)
+  const [library, setLibrary] = useState<Library | null>(null)
+  const listRequest = useRef(0)
   const [listFailed, setListFailed] = useState(false)
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [screen, setScreen] = useState("overview")
+  const [mobileLibrary, setMobileLibrary] = useState(false)
+  const activeId = screen === "overview" || screen === "upload" ? null : screen
+  function select(id: string | null) {
+    setScreen(id ?? "overview")
+    setMobileLibrary(false)
+  }
   // A list request still in flight after logout must not bounce the login page with a stale "expired" message.
   const alive = useRef(true)
   useEffect(() => {
@@ -323,9 +329,10 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
   }, [])
 
   const loadList = useCallback(() => {
-    return api<{ papers: PaperSummary[] }>("GET", "/api/papers").then((r) => {
-      if (!alive.current) return
-      if (r.ok) setPapers(r.data.papers)
+    const request = ++listRequest.current
+    return api<Library>("GET", "/api/papers").then((r) => {
+      if (!alive.current || request !== listRequest.current) return
+      if (r.ok) setLibrary(r.data)
       else if (r.status === 401) return onExpired("the paper list could not be loaded")
       setListFailed(!r.ok)
     })
@@ -333,49 +340,33 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
   useEffect(() => {
     void loadList()
   }, [loadList])
-  const goHome = useCallback(() => setActiveId(null), [])
+  const goHome = () => select(null)
+  const openUpload = () => select("upload")
+  useEffect(() => {
+    if (screen !== "overview") return
+    window.addEventListener("focus", loadList)
+    return () => window.removeEventListener("focus", loadList)
+  }, [screen, loadList])
 
   return (
     <div className="flex min-h-svh flex-col md:h-svh md:flex-row">
       <aside className="flex shrink-0 flex-col gap-3 border-b bg-sidebar p-3 text-sidebar-foreground md:w-64 md:border-r md:border-b-0">
         <div className="px-2 pt-1 text-lg font-semibold">{appName}</div>
-        <Button variant="outline" className="justify-start" onClick={goHome}>
-          <Plus /> Upload a paper
-        </Button>
-        <div className="px-2 text-xs font-medium text-muted-foreground">My papers</div>
-        <nav aria-label="My papers" className="flex max-h-48 flex-col gap-1 overflow-y-auto md:max-h-none md:flex-1">
-          {listFailed ? (
-            <p className="px-2 text-sm text-destructive">
-              Couldn't load the list. That doesn't mean you have no papers.
-              <Button variant="link" className="h-auto p-0" onClick={loadList}>
-                Retry
-              </Button>
-            </p>
-          ) : !papers ? (
-            <p className="px-2 text-sm text-muted-foreground">Loading…</p>
-          ) : !papers.length ? (
-            <p className="px-2 text-sm text-muted-foreground">No papers yet</p>
-          ) : (
-            papers.map((p) => (
-              <Button
-                key={p.id}
-                variant={p.id === activeId ? "secondary" : "ghost"}
-                className="h-auto justify-between gap-2 px-2 py-1.5 text-left font-normal"
-                aria-current={p.id === activeId ? "page" : undefined}
-                title={`Uploaded ${fmtTime(p.uploaded_at)}${p.last_activity_at ? ` · last practiced ${fmtTime(p.last_activity_at)}` : ""}`}
-                onClick={() => setActiveId(p.id)}
-              >
-                <span className="grid min-w-0">
-                  <span className="truncate">{p.title}</span>
-                  <span className="text-xs text-muted-foreground">{shortTime(p.uploaded_at)}</span>
-                </span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {p.stats.answered}/{p.stats.total}
-                </span>
-              </Button>
-            ))
-          )}
-        </nav>
+        <div className="flex flex-wrap gap-1 md:flex-col">
+          <Button variant={screen === "overview" ? "secondary" : "ghost"} aria-current={screen === "overview" ? "page" : undefined} className="justify-start" onClick={goHome}>
+            <LayoutDashboard /> Overview
+          </Button>
+          <Button variant={screen === "upload" ? "secondary" : "ghost"} className="justify-start" onClick={openUpload}>
+            <Plus /> Upload a paper
+          </Button>
+          <Button variant="ghost" className="md:hidden" aria-expanded={mobileLibrary} onClick={() => setMobileLibrary(!mobileLibrary)}>
+            <LibraryBig /> My papers
+          </Button>
+        </div>
+        <div className={cn("min-h-0 flex-1 flex-col gap-2 md:flex", mobileLibrary ? "flex" : "hidden")}>
+          <PaperLibrary library={library} failed={listFailed} activeId={activeId} select={select}
+            reload={loadList} expired={() => onExpired("the library could not be updated")} />
+        </div>
         <div className="flex items-center gap-2 border-t pt-3">
           <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm text-primary-foreground">
             {user.username[0].toUpperCase()}
@@ -387,12 +378,16 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
           </Button>
         </div>
       </aside>
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto grid max-w-2xl gap-4 p-6 md:py-10">
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className={cn("mx-auto grid gap-5 p-5 md:px-8 md:py-12", screen === "overview" ? "max-w-4xl" : "max-w-2xl")}>
           {activeId ? (
             <Practice key={activeId} paperId={activeId} onExpired={onExpired} onChanged={loadList} onHome={goHome} />
+          ) : screen === "upload" ? (
+            <UploadPaper onExpired={onExpired} onChanged={loadList} onOpen={select} />
+          ) : library ? (
+            <Overview library={library} open={select} upload={openUpload} />
           ) : (
-            <Home onExpired={onExpired} onChanged={loadList} onOpen={setActiveId} />
+            <p role="status">{listFailed ? <button className="underline" onClick={loadList}>Retry loading overview</button> : "Loading overview…"}</p>
           )}
         </div>
       </main>
@@ -418,7 +413,7 @@ type UploadStatus =
   | { kind: "uncertain" }
   | { kind: "error"; error: ApiError }
 
-function Home(props: { onExpired: (what: string) => void; onChanged: () => void; onOpen: (id: string) => void }) {
+function UploadPaper(props: { onExpired: (what: string) => void; onChanged: () => void; onOpen: (id: string) => void }) {
   const { onExpired, onChanged, onOpen } = props
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -457,7 +452,7 @@ function Home(props: { onExpired: (what: string) => void; onChanged: () => void;
 
   return (
     <>
-      <h1 className="text-3xl font-semibold tracking-tight">What would you like to practice today?</h1>
+      <h1 className="text-[1.75rem] leading-tight font-medium tracking-tight sm:text-[2.125rem]">Upload a paper</h1>
       <p className="text-muted-foreground">
         Upload a JSON paper you prepared elsewhere. Grace saves it to the cloud so you can keep practicing on any device.
       </p>
@@ -532,7 +527,7 @@ function Home(props: { onExpired: (what: string) => void; onChanged: () => void;
           questions need options and correct_option_id; translation and sentence questions need accepted_answers.
           Every question needs id, prompt, correct_answer and explanation.
         </p>
-        <pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs">{FORMAT_EXAMPLE}</pre>
+        <pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 text-xs">{FORMAT_EXAMPLE}</pre>
       </details>
     </>
   )
