@@ -321,10 +321,20 @@ fn required_unique_id(
     }
 }
 
-/// The paper every user starts with (`default-paper.json`).
-pub fn default_paper() -> PaperFile {
-    parse(&serde_json::from_str(include_str!("default-paper.json")).expect("default-paper.json is valid JSON"))
-        .expect("default-paper.json is valid")
+// Slot numbers are permanent delivery IDs shared with the migration.
+pub fn starters() -> &'static [(i16, PaperFile)] {
+    static CATALOG: std::sync::OnceLock<Vec<(i16, PaperFile)>> = std::sync::OnceLock::new();
+    CATALOG.get_or_init(|| [
+        (1, include_str!("default-paper.json")),
+        (2, include_str!("starters/basic-sentences.json")),
+        (3, include_str!("starters/questions.json")),
+        (4, include_str!("starters/simple-subordinate-clauses.json")),
+        (5, include_str!("starters/relative-clauses.json")),
+        (6, include_str!("starters/complex-sentences.json")),
+    ].into_iter().map(|(slot, file)| {
+        let paper = parse(&serde_json::from_str(file).expect("starter JSON")).expect("valid starter paper");
+        (slot, paper)
+    }).collect())
 }
 
 fn check_string<'a>(v: &'a Value, label: &str, max_chars: usize, errors: &mut Vec<String>) -> Option<&'a str> {
@@ -430,6 +440,22 @@ mod tests {
     }
 
     #[test]
+    fn grammar_starters_have_ten_four_choice_questions() {
+        for (slot, paper) in starters().iter().skip(1) {
+            assert_eq!(paper.questions.len(), 10, "slot {slot}");
+            for q in &paper.questions {
+                assert_eq!(q.kind, Kind::Choice);
+                assert_eq!(q.options.len(), 4);
+                let texts: std::collections::HashSet<_> = q.options.iter().map(|o| &o.text).collect();
+                assert_eq!(texts.len(), 4);
+                let answer = q.options.iter().find(|o| Some(&o.id) == q.correct_option_id.as_ref()).unwrap();
+                assert_eq!(answer.text, q.correct_answer);
+                assert!(!q.explanation.trim().is_empty());
+            }
+        }
+    }
+
+    #[test]
     fn parses_valid_sample_and_default_paper() {
         let sample: Value = serde_json::from_str(include_str!("../../../examples/french-basics.json")).unwrap();
         let p = parse(&sample).expect("french-basics.json should parse");
@@ -447,7 +473,7 @@ mod tests {
         assert_eq!(p.questions[1].accepted_answers, ["Merci", "Merci !"]);
         assert_eq!(p.questions[2].accepted_answers, ["J'aime le français."]);
 
-        let def = default_paper();
+        let def = &starters()[0].1;
         assert_eq!(def.questions.len(), 3);
         assert_eq!(def.questions[0].id, "q1");
     }

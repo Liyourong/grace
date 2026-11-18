@@ -7,6 +7,7 @@
 mod explain;
 mod rules;
 mod store;
+mod time;
 
 use axum::{
     Json, Router,
@@ -21,6 +22,7 @@ use serde_json::{Value, json};
 pub use rules::{Stats, normalize};
 pub use store::{answers, progress};
 
+use crate::observation::step;
 use crate::{
     auth::CurrentUser,
     common::{AppError, AppState, Body, Result, parse_id},
@@ -29,6 +31,7 @@ use crate::{
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/api/practice/time", post(time::record))
         .route("/api/papers/{paper_id}/answers/{question_id}", put(save_answer))
         .route("/api/papers/{paper_id}/answers/{question_id}/explain", post(explain_answer))
         .route("/api/papers/{paper_id}/position", put(save_position))
@@ -56,27 +59,36 @@ async fn save_answer(
     Path((paper_id, question_id)): Path<(String, String)>,
     Body(body): Body<Versioned<rules::Submission>>,
 ) -> Result<Json<Value>> {
-    let paper_id = parse_id(&paper_id)?;
-    let mut db = s.pool.get().await?;
-    let q = find_question(&db, paper_id, user.id, &question_id).await?;
-    let key = if q.kind.as_str() == "choice" {
-        let option_ids = q.options.as_ref()
-            .map(|options| options.iter().map(|o| o.id.as_str()).collect())
-            .unwrap_or_default();
-        rules::GradingKey::Choice {
-            option_ids,
-            correct_option_id: q.correct_option_id.as_deref(),
-        }
-    } else {
-        rules::GradingKey::Text { accepted_answers: &q.accepted_answers }
-    };
-    let expected = body.revision()?;
-    let (saved, is_correct) = rules::grade(body.data, key)?;
-    let tx = db.transaction().await?;
-    let revision = store::save_position(&tx, user.id, paper_id, q.id, expected).await?;
-    let updated_at = store::save_answer(&tx, user.id, q.id, &saved, is_correct).await?;
-    let stats = stats(&tx, paper_id, user.id).await?;
-    tx.commit().await?;
+    let (paper_id, mut db, q) = step("Question lookup", async {
+        let paper_id = parse_id(&paper_id)?;
+        let db = s.pool.get().await?;
+        let q = find_question(&db, paper_id, user.id, &question_id).await?;
+        Ok((paper_id, db, q))
+    }).await?;
+    let (expected, saved, is_correct) = step("Grading", async {
+        let key = if q.kind.as_str() == "choice" {
+            let option_ids = q.options.as_ref()
+                .map(|options| options.iter().map(|o| o.id.as_str()).collect())
+                .unwrap_or_default();
+            rules::GradingKey::Choice {
+                option_ids,
+                correct_option_id: q.correct_option_id.as_deref(),
+            }
+        } else {
+            rules::GradingKey::Text { accepted_answers: &q.accepted_answers }
+        };
+        let expected = body.revision()?;
+        let (saved, is_correct) = rules::grade(body.data, key)?;
+        Ok((expected, saved, is_correct))
+    }).await?;
+    let (revision, updated_at, stats) = step("Save transaction", async {
+        let tx = db.transaction().await?;
+        let revision = store::save_position(&tx, user.id, paper_id, q.id, expected).await?;
+        let updated_at = store::save_answer(&tx, user.id, q.id, &saved, is_correct).await?;
+        let stats = stats(&tx, paper_id, user.id).await?;
+        tx.commit().await?;
+        Ok((revision, updated_at, stats))
+    }).await?;
     Ok(Json(json!({
         "answer": {
             "saved_answer": saved,

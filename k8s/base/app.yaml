@@ -21,6 +21,8 @@ spec:
             - configMapRef: { name: grace-config }
           env:
             - { name: METRICS_PORT, value: "9101" }
+            - name: GRACE_TEST_PASSWORD_HASH
+              valueFrom: { secretKeyRef: { name: grace-test-account, key: password-hash, optional: true } }
             - name: POSTGRES_PASSWORD
               valueFrom: { secretKeyRef: { name: grace-db, key: password } }
             # The secret is hex, so it is safe inside a URL without escaping.

@@ -61,8 +61,27 @@ const QUERIES: &[(&str, &str)] = &[
         "1000 * sum(rate(grace_answer_seconds_total{namespace=\"grace\"}[2m])) / sum(rate(grace_answers_total{namespace=\"grace\"}[2m]))",
     ),
 ];
-pub async fn ranges() -> Result<Json<Value>, StatusCode> {
+type ResultSet = Result<Json<Value>, StatusCode>;
+
+pub async fn ranges() -> ResultSet {
+    query(false, super::now() / 1000 / 15 * 15).await
+}
+
+pub async fn viewer_ranges() -> ResultSet {
+    static CACHE: tokio::sync::Mutex<Option<(u64, ResultSet)>> =
+        tokio::sync::Mutex::const_new(None);
     let end = super::now() / 1000 / 15 * 15;
+    let mut cache = CACHE.lock().await;
+    if let Some((t, result)) = &*cache {
+        if *t == end {
+            return result.clone();
+        }
+    }
+    let result = query(true, end).await;
+    *cache = Some((end, result.clone()));
+    result
+}
+async fn query(viewer: bool, end: u64) -> ResultSet {
     let base = std::env::var("PROMETHEUS_URL")
         .unwrap_or_else(|_| "http://grace-monitor-prometheus-server.grace.svc".into());
     let client = reqwest::Client::builder()
@@ -70,33 +89,40 @@ pub async fn ranges() -> Result<Json<Value>, StatusCode> {
         .build()
         .unwrap();
     let url = format!("{base}/api/v1/query_range");
-    let results = join_all(QUERIES.iter().map(|(key, query)| {
-        let req = client.get(&url).query(&[
-            ("query", query.to_string()),
-            ("start", (end - 900).to_string()),
-            ("end", end.to_string()),
-            ("step", "15".into()),
-        ]);
-        async move {
-            let result = async {
-                let data = req
-                    .send()
-                    .await?
-                    .error_for_status()?
-                    .json::<Value>()
-                    .await?;
-                Ok::<_, reqwest::Error>(data)
-            }
-            .await;
-            (
-                *key,
-                result
-                    .ok()
-                    .filter(|v| v["status"] == "success")
-                    .map(|v| v["data"]["result"].clone()),
-            )
-        }
-    }))
+    let results = join_all(
+        QUERIES
+            .iter()
+            .filter(|(key, _)| {
+                !viewer || matches!(*key, "cpu" | "memory" | "root" | "podIn" | "podOut")
+            })
+            .map(|(key, query)| {
+                let req = client.get(&url).query(&[
+                    ("query", query.to_string()),
+                    ("start", (end - 900).to_string()),
+                    ("end", end.to_string()),
+                    ("step", "15".into()),
+                ]);
+                async move {
+                    let result = async {
+                        let data = req
+                            .send()
+                            .await?
+                            .error_for_status()?
+                            .json::<Value>()
+                            .await?;
+                        Ok::<_, reqwest::Error>(data)
+                    }
+                    .await;
+                    (
+                        *key,
+                        result
+                            .ok()
+                            .filter(|v| v["status"] == "success")
+                            .map(|v| v["data"]["result"].clone()),
+                    )
+                }
+            }),
+    )
     .await;
     if results.iter().all(|r| r.1.is_none()) {
         return Err(StatusCode::SERVICE_UNAVAILABLE);

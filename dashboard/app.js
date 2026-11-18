@@ -1,11 +1,18 @@
 "use strict";
+const audience = document.documentElement.hasAttribute("data-viewer");
+if (!audience && location.origin === "http://127.0.0.1:19090" && /^#presenter=[a-f0-9]{64}$/.test(location.hash)) {
+  localStorage.setItem("grace.presenter", location.hash.slice("#presenter=".length));
+  history.replaceState(null, "", "/#topology-view");
+}
 const $ = (id) => document.getElementById(id);
 const colors = ["#a9c5eb", "#afa4cd", "#e0b481", "#93bcae", "#e398a1"];
 const time = (ms) => new Date(ms).toLocaleTimeString();
 let view,
   metrics,
   selection = "",
-  streamLive = false;
+  streamLive = false,
+  lastContact = 0,
+  contactTimeout;
 const seen = new Set(),
   slots = new Map();
 function svg(tag, attributes, parent, label) {
@@ -177,7 +184,7 @@ function drawMap(animate) {
         201,
         y + 32,
         (p.deleting ? "Terminating" : p.ready ? "Ready" : p.phase) +
-          (p.app === "grace" ? "   ·   " + count + " logins" : ""),
+          (!audience && p.app === "grace" ? "   ·   " + count + " logins" : ""),
         "#b2b5be",
         10,
       );
@@ -569,6 +576,7 @@ function drawResourceStrip() {
 function drawCharts() {
   drawFlow();
   drawResourceStrip();
+  if (audience) return;
   const parent = $("charts");
   parent.replaceChildren();
   if (metrics)
@@ -698,12 +706,12 @@ $("loadButton").onclick = async () => {
   try {
     const result = await fetch("/api/load-test", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(localStorage.getItem("grace.presenter") && {Authorization: "Bearer " + localStorage.getItem("grace.presenter")}) },
       body: JSON.stringify(command),
     });
     if (!result.ok)
       loadError =
-        result.status === 409
+        result.status === 401 ? "Open your private presenter link to unlock this browser." : result.status === 409
           ? "Waiting for HPA or scale-down."
           : "Load control unavailable (" + result.status + ").";
   } catch {
@@ -721,11 +729,15 @@ function showSync() {
     Object.values(view.synced).every(Boolean);
   $("sync").dataset.live = String(ok);
   $("sync").textContent = ok ? "Live" : "Sync interrupted / connecting";
-  $("updated").textContent = view?.updated
-    ? "Synced " + time(view.updated)
-    : "Waiting";
+  $("updated").textContent = lastContact
+    ? "Last contact " + time(lastContact)
+    : "Waiting for dashboard";
+  $("updated").title = view?.updated
+    ? "Last Kubernetes sync " + time(view.updated)
+    : "Waiting for Kubernetes";
 }
 function selectView() {
+  if (audience) return;
   const links = [...document.querySelectorAll(".toolbar nav a")];
   const active = links.find((a) => a.hash === location.hash) || links[0];
   for (const link of links) {
@@ -740,6 +752,19 @@ $("overview").onclick = () => {
   if (view) choose("");
 };
 const feed = new EventSource("/api/events");
+function recordContact() {
+  lastContact = Date.now();
+  streamLive = true;
+  clearTimeout(contactTimeout);
+  contactTimeout = setTimeout(contactLost, 12000);
+  showSync();
+}
+function contactLost() {
+  clearTimeout(contactTimeout);
+  streamLive = false;
+  showSync();
+}
+feed.addEventListener("heartbeat", recordContact);
 feed.onmessage = (e) => {
   const next = JSON.parse(e.data),
     changedRun = next.run?.started !== view?.run?.started;
@@ -752,8 +777,7 @@ feed.onmessage = (e) => {
   if (!view || JSON.stringify(next.pod_events) !== JSON.stringify(view.pod_events))
     drawPodEvents(next.pod_events || []);
   view = next;
-  streamLive = true;
-  showSync();
+  recordContact();
   if (topologyChanged || burstChanged) drawMap(wasLive);
   if (burstChanged) {
     drawRun();
@@ -761,10 +785,7 @@ feed.onmessage = (e) => {
   }
   drawHealth();
 };
-feed.onerror = () => {
-  streamLive = false;
-  showSync();
-};
+feed.onerror = contactLost;
 $("worker").onchange = (e) => choose(e.target.value);
 async function fetchMetrics() {
   try {
@@ -781,3 +802,5 @@ async function fetchMetrics() {
   setTimeout(fetchMetrics, 15000);
 }
 fetchMetrics();
+
+if (!audience && location.port === "19090") import("/logs.js");

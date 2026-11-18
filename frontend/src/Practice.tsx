@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, ArrowRight, ArrowUp, Check, X } from "lucide-react"
 
 import { api, type Answer, type ApiError, type ExplainResponse, type Paper, type Question, type Stats } from "@/api"
+import { useStudyTime } from "@/useStudyTime"
 import { Notice } from "@/components/notice"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,6 +33,7 @@ export function Practice(props: {
   const { paperId, onExpired, onChanged, onHome } = props
   const base = `/api/papers/${encodeURIComponent(paperId)}`
   const [paper, setPaper] = useState<Paper | null>(null)
+  const [clockOffset, setClockOffset] = useState<number | null>(null)
   const [loadError, setLoadError] = useState<ApiError | null>(null)
   const [attempt, setAttempt] = useState(0)
   const [index, setIndex] = useState(0)
@@ -93,6 +95,9 @@ export function Practice(props: {
         }
         progress.current = { revision: r.data.revision }
         targetIndex.current = Math.max(0, r.data.questions.findIndex((q) => q.id === r.data.current_question_id))
+        const serverDate = Date.parse(r.serverDate ?? "")
+        const epoch = Number.isFinite(serverDate) && Math.abs(serverDate - Date.now()) > 1500 ? serverDate : Date.now()
+        setClockOffset(epoch - performance.now())
         setPaper(r.data)
         setIndex(targetIndex.current)
         setNavigating(false)
@@ -107,6 +112,8 @@ export function Practice(props: {
       explainRequestId.current += 1
     }
   }, [base, attempt, onExpired])
+
+  useStudyTime(clockOffset, !!paper?.questions.length && !finished, onChanged)
 
   if (loadError)
     return (
@@ -208,7 +215,7 @@ export function Practice(props: {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">{paper.title}</h1>
+      <h1 className="font-reading text-[clamp(2rem,4vw,2.75rem)] leading-tight font-normal tracking-tight wrap-anywhere">{paper.title}</h1>
       {paper.description && <p className="text-muted-foreground">{paper.description}</p>}
       <div className="grid gap-1.5">
         <Progress value={stats.total ? (stats.answered / stats.total) * 100 : 0} aria-label="Progress" />
@@ -263,7 +270,7 @@ export function Practice(props: {
                 Question {index + 1} of {questions.length}
               </span>
             </div>
-            <p className="text-lg whitespace-pre-wrap">{q.prompt}</p>
+            <p className="font-reading text-[1.375rem] leading-[1.45] wrap-anywhere whitespace-pre-wrap sm:text-2xl">{q.prompt}</p>
             {q.kind === "choice" ? (
               <div className="grid gap-2">
                 {q.options?.map((o, i) => {
@@ -273,7 +280,7 @@ export function Practice(props: {
                       key={o.id}
                       variant="outline"
                       className={cn(
-                        "h-auto justify-start py-2 text-left font-normal whitespace-normal",
+                        "h-auto justify-start py-2 text-left text-base leading-relaxed font-normal whitespace-normal",
                         chosen && (q.answer?.is_correct ? OK : BAD)
                       )}
                       aria-pressed={chosen}

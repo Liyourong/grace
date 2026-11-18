@@ -1,0 +1,267 @@
+{
+  "format_version": 1,
+  "title": "Questions",
+  "description": "Ask for information with question words, est-ce que and inversion.",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "prompt": "Ask about a place: « ___ est-ce que tu habites ? »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Combien"
+        },
+        {
+          "id": "b",
+          "text": "Où"
+        },
+        {
+          "id": "c",
+          "text": "Pourquoi"
+        },
+        {
+          "id": "d",
+          "text": "Quand"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "Où",
+      "explanation": "Où asks where someone lives."
+    },
+    {
+      "id": "q2",
+      "type": "choice",
+      "prompt": "Ask for a reason: « ___ est-ce que Léa part tôt ? »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Quand"
+        },
+        {
+          "id": "b",
+          "text": "Pourquoi"
+        },
+        {
+          "id": "c",
+          "text": "Où"
+        },
+        {
+          "id": "d",
+          "text": "Comment"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "Pourquoi",
+      "explanation": "Pourquoi asks why. A natural answer begins with parce que."
+    },
+    {
+      "id": "q3",
+      "type": "choice",
+      "prompt": "Use subject–verb inversion to ask “Are you ready?” (vous, masculine plural).",
+      "options": [
+        {
+          "id": "a",
+          "text": "Vous êtes prêts ?"
+        },
+        {
+          "id": "b",
+          "text": "Est-ce que vous êtes prêts ?"
+        },
+        {
+          "id": "c",
+          "text": "Sont-vous prêts ?"
+        },
+        {
+          "id": "d",
+          "text": "Êtes-vous prêts ?"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "Êtes-vous prêts ?",
+      "explanation": "Inversion places êtes before its subject vous and joins them with a hyphen."
+    },
+    {
+      "id": "q4",
+      "type": "choice",
+      "prompt": "Ask “Does she like jazz?” using inversion.",
+      "options": [
+        {
+          "id": "a",
+          "text": "Aime-t-elle le jazz ?"
+        },
+        {
+          "id": "b",
+          "text": "Aime-elle le jazz ?"
+        },
+        {
+          "id": "c",
+          "text": "Aime-t-il le jazz ?"
+        },
+        {
+          "id": "d",
+          "text": "Aime-t-elles le jazz ?"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "Aime-t-elle le jazz ?",
+      "explanation": "The inserted -t- links aime and elle in inversion."
+    },
+    {
+      "id": "q5",
+      "type": "choice",
+      "prompt": "Choose the est-ce que form of “Are they coming?” (ils).",
+      "options": [
+        {
+          "id": "a",
+          "text": "Est-ce que viennent-ils ?"
+        },
+        {
+          "id": "b",
+          "text": "Est-ce qu’ils viennent ?"
+        },
+        {
+          "id": "c",
+          "text": "Est-ce qu’ils vient ?"
+        },
+        {
+          "id": "d",
+          "text": "Est-ce ils viennent ?"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "Est-ce qu’ils viennent ?",
+      "explanation": "Que elides before ils. After est-ce que, the subject precedes viennent."
+    },
+    {
+      "id": "q6",
+      "type": "choice",
+      "prompt": "Ask how many chairs there are: « ___ chaises y a-t-il ? »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Combien du"
+        },
+        {
+          "id": "b",
+          "text": "Combien les"
+        },
+        {
+          "id": "c",
+          "text": "Combien des"
+        },
+        {
+          "id": "d",
+          "text": "Combien de"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "Combien de",
+      "explanation": "Combien de introduces a counted noun such as chaises."
+    },
+    {
+      "id": "q7",
+      "type": "choice",
+      "prompt": "Choose the interrogative adjective: « ___ heure est-il ? »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Quel"
+        },
+        {
+          "id": "b",
+          "text": "Quelles"
+        },
+        {
+          "id": "c",
+          "text": "Quelle"
+        },
+        {
+          "id": "d",
+          "text": "Quels"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "Quelle",
+      "explanation": "Heure is feminine singular, so the question starts with quelle."
+    },
+    {
+      "id": "q8",
+      "type": "choice",
+      "prompt": "Ask who performs the action: « ___ prépare le dîner ? »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Où"
+        },
+        {
+          "id": "b",
+          "text": "Que"
+        },
+        {
+          "id": "c",
+          "text": "Qui"
+        },
+        {
+          "id": "d",
+          "text": "Quand"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "Qui",
+      "explanation": "Qui can serve as the subject of prépare and asks for a person."
+    },
+    {
+      "id": "q9",
+      "type": "choice",
+      "prompt": "Ask what the listener is reading using est-ce que.",
+      "options": [
+        {
+          "id": "a",
+          "text": "Qu’est-ce que tu lis ?"
+        },
+        {
+          "id": "b",
+          "text": "Où est-ce que tu lis ?"
+        },
+        {
+          "id": "c",
+          "text": "Qui est-ce qui lit ?"
+        },
+        {
+          "id": "d",
+          "text": "Quand est-ce que tu lis ?"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "Qu’est-ce que tu lis ?",
+      "explanation": "Qu’est-ce que asks about the object of lis. The other questions ask who, when or where."
+    },
+    {
+      "id": "q10",
+      "type": "choice",
+      "prompt": "Ask for a departure time: « ___ part le train ? »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Dans quelle direction"
+        },
+        {
+          "id": "b",
+          "text": "À quelle heure"
+        },
+        {
+          "id": "c",
+          "text": "Pour quelle raison"
+        },
+        {
+          "id": "d",
+          "text": "De quelle couleur"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "À quelle heure",
+      "explanation": "À quelle heure asks for a time of day."
+    }
+  ]
+}

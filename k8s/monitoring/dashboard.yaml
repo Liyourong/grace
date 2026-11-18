@@ -13,7 +13,7 @@ spec:
         - name: dashboard
           image: grace:local
           command: [dashboard]
-          ports: [{ name: http, containerPort: 9090 }]
+          ports: [{ name: http, containerPort: 9090 }, { name: viewer, containerPort: 9092 }]
           readinessProbe: { httpGet: { path: /health/ready, port: http } }
           resources:
             requests: { cpu: 20m, memory: 24Mi }
@@ -25,4 +25,4 @@ kind: Service
 metadata: { name: grace-dashboard }
 spec:
   selector: { app: grace-dashboard }
-  ports: [{ name: http, port: 9090, targetPort: http }]
+  ports: [{ name: http, port: 9090, targetPort: http }, { name: viewer, port: 9092, targetPort: viewer }]

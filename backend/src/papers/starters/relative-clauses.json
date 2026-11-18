@@ -1,0 +1,267 @@
+{
+  "format_version": 1,
+  "title": "Relative Clauses",
+  "description": "Choose qui, que, où or dont by the role of the missing phrase.",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "prompt": "Complete the sentence: « La voisine ___ habite ici est médecin. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "qui"
+        },
+        {
+          "id": "b",
+          "text": "dont"
+        },
+        {
+          "id": "c",
+          "text": "où"
+        },
+        {
+          "id": "d",
+          "text": "que"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "qui",
+      "explanation": "The missing word is the subject of habite. Use qui."
+    },
+    {
+      "id": "q2",
+      "type": "choice",
+      "prompt": "Complete the sentence: « Voici le livre ___ tu cherches. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "où"
+        },
+        {
+          "id": "b",
+          "text": "dont"
+        },
+        {
+          "id": "c",
+          "text": "qui"
+        },
+        {
+          "id": "d",
+          "text": "que"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "que",
+      "explanation": "Tu is the subject of cherches. Le livre is its direct object, represented by que."
+    },
+    {
+      "id": "q3",
+      "type": "choice",
+      "prompt": "Refer to a place: « C’est la ville ___ je suis né. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "que"
+        },
+        {
+          "id": "b",
+          "text": "qui"
+        },
+        {
+          "id": "c",
+          "text": "où"
+        },
+        {
+          "id": "d",
+          "text": "dont"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "où",
+      "explanation": "Où supplies the place where the speaker was born."
+    },
+    {
+      "id": "q4",
+      "type": "choice",
+      "prompt": "Replace « de ce film »: « Le film ___ je parle a reçu un prix. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "qui"
+        },
+        {
+          "id": "b",
+          "text": "dont"
+        },
+        {
+          "id": "c",
+          "text": "où"
+        },
+        {
+          "id": "d",
+          "text": "que"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "dont",
+      "explanation": "Parler de calls for de. Dont stands for de ce film."
+    },
+    {
+      "id": "q5",
+      "type": "choice",
+      "prompt": "Complete the sentence: « Les clés ___ sont sur la table sont à toi. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "que"
+        },
+        {
+          "id": "b",
+          "text": "où"
+        },
+        {
+          "id": "c",
+          "text": "dont"
+        },
+        {
+          "id": "d",
+          "text": "qui"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "qui",
+      "explanation": "Les clés is the subject of sont in the relative clause, so use qui."
+    },
+    {
+      "id": "q6",
+      "type": "choice",
+      "prompt": "Refer to a moment: « Je me souviens du jour ___ nous avons déménagé. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "où"
+        },
+        {
+          "id": "b",
+          "text": "qui"
+        },
+        {
+          "id": "c",
+          "text": "dont"
+        },
+        {
+          "id": "d",
+          "text": "que"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "où",
+      "explanation": "Où can refer to a time as well as a place. Here it means “on which.”"
+    },
+    {
+      "id": "q7",
+      "type": "choice",
+      "prompt": "Complete the sentence: « Le tableau ___ elle admire est ancien. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "qu’"
+        },
+        {
+          "id": "b",
+          "text": "dont"
+        },
+        {
+          "id": "c",
+          "text": "où"
+        },
+        {
+          "id": "d",
+          "text": "qui"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "qu’",
+      "explanation": "Admirer takes a direct object. Que becomes qu’ before elle."
+    },
+    {
+      "id": "q8",
+      "type": "choice",
+      "prompt": "Express possession: « Une amie ___ le frère vit à Lille vient dîner. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "où"
+        },
+        {
+          "id": "b",
+          "text": "qui"
+        },
+        {
+          "id": "c",
+          "text": "dont"
+        },
+        {
+          "id": "d",
+          "text": "que"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "dont",
+      "explanation": "Le frère de cette amie becomes dont le frère."
+    },
+    {
+      "id": "q9",
+      "type": "choice",
+      "prompt": "Join the statements: « J’ai perdu le stylo. Tu m’as prêté ce stylo. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "J’ai perdu le stylo où tu m’as prêté."
+        },
+        {
+          "id": "b",
+          "text": "J’ai perdu le stylo qui tu m’as prêté."
+        },
+        {
+          "id": "c",
+          "text": "J’ai perdu le stylo dont tu m’as prêté."
+        },
+        {
+          "id": "d",
+          "text": "J’ai perdu le stylo que tu m’as prêté."
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "J’ai perdu le stylo que tu m’as prêté.",
+      "explanation": "Prêter quelque chose à quelqu’un takes the item as its direct object. Que represents the pen."
+    },
+    {
+      "id": "q10",
+      "type": "choice",
+      "prompt": "Complete the sentence: « C’est un outil ___ nous avons besoin. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "que"
+        },
+        {
+          "id": "b",
+          "text": "dont"
+        },
+        {
+          "id": "c",
+          "text": "où"
+        },
+        {
+          "id": "d",
+          "text": "qui"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "dont",
+      "explanation": "Avoir besoin de introduces the needed item with de. Use dont."
+    }
+  ]
+}

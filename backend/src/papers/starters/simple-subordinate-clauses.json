@@ -1,0 +1,267 @@
+{
+  "format_version": 1,
+  "title": "Simple Subordinate Clauses",
+  "description": "Link a main clause to a statement, reason, time or condition.",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "prompt": "Complete the reported statement: « Je pense ___ Léa a raison. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "que"
+        },
+        {
+          "id": "b",
+          "text": "qui"
+        },
+        {
+          "id": "c",
+          "text": "de"
+        },
+        {
+          "id": "d",
+          "text": "où"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "que",
+      "explanation": "Penser que introduces a statement with its own subject and verb."
+    },
+    {
+      "id": "q2",
+      "type": "choice",
+      "prompt": "Report “He says she is coming”: « Il dit ___ arrive. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "qu’il"
+        },
+        {
+          "id": "b",
+          "text": "qui elle"
+        },
+        {
+          "id": "c",
+          "text": "qu’elle"
+        },
+        {
+          "id": "d",
+          "text": "que elle"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "qu’elle",
+      "explanation": "Que elides before elle, giving qu’elle."
+    },
+    {
+      "id": "q3",
+      "type": "choice",
+      "prompt": "Give the reason: « Je prends un parapluie ___ il pleut. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "à cause de"
+        },
+        {
+          "id": "b",
+          "text": "parce qu’"
+        },
+        {
+          "id": "c",
+          "text": "malgré"
+        },
+        {
+          "id": "d",
+          "text": "pour que"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "parce qu’",
+      "explanation": "Parce que introduces a clause explaining the reason. Before il it becomes parce qu’."
+    },
+    {
+      "id": "q4",
+      "type": "choice",
+      "prompt": "Use a time clause meaning “when”: « Je ferme la porte ___ je pars. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "même si"
+        },
+        {
+          "id": "b",
+          "text": "pour que"
+        },
+        {
+          "id": "c",
+          "text": "parce que"
+        },
+        {
+          "id": "d",
+          "text": "quand"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "quand",
+      "explanation": "Quand links the action of closing the door to the time of departure."
+    },
+    {
+      "id": "q5",
+      "type": "choice",
+      "prompt": "Complete a real condition: « S’il ___ demain, nous resterons ici. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "pleuvrait"
+        },
+        {
+          "id": "b",
+          "text": "pleuvra"
+        },
+        {
+          "id": "c",
+          "text": "pleut"
+        },
+        {
+          "id": "d",
+          "text": "pleuvoir"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "pleut",
+      "explanation": "For this possible future condition, use the present tense after si."
+    },
+    {
+      "id": "q6",
+      "type": "choice",
+      "prompt": "Ask indirectly whether the shop is open: « Je me demande ___ le magasin est ouvert. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "si"
+        },
+        {
+          "id": "b",
+          "text": "que"
+        },
+        {
+          "id": "c",
+          "text": "parce que"
+        },
+        {
+          "id": "d",
+          "text": "pendant"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "si",
+      "explanation": "Si introduces an indirect yes-or-no question."
+    },
+    {
+      "id": "q7",
+      "type": "choice",
+      "prompt": "Report the reason for her absence: « Elle explique qu’elle reste chez elle ___ elle est malade. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "malgré"
+        },
+        {
+          "id": "b",
+          "text": "à cause de"
+        },
+        {
+          "id": "c",
+          "text": "afin de"
+        },
+        {
+          "id": "d",
+          "text": "parce qu’"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "parce qu’",
+      "explanation": "Elle est malade is a full clause. Parce qu’ introduces it as the reason."
+    },
+    {
+      "id": "q8",
+      "type": "choice",
+      "prompt": "Choose the sentence meaning “I know that you work here.”",
+      "options": [
+        {
+          "id": "a",
+          "text": "Je sais que tu travaillais ici."
+        },
+        {
+          "id": "b",
+          "text": "Je sais que tu travailles ici."
+        },
+        {
+          "id": "c",
+          "text": "Je sais si tu travailles ici."
+        },
+        {
+          "id": "d",
+          "text": "Je veux que tu travailles ici."
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "Je sais que tu travailles ici.",
+      "explanation": "Sais que introduces a known fact. Travailles puts that fact in the present."
+    },
+    {
+      "id": "q9",
+      "type": "choice",
+      "prompt": "Complete the future time clause: « Quand vous ___ à Paris demain, appelez-moi. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "arriveriez"
+        },
+        {
+          "id": "b",
+          "text": "arriviez"
+        },
+        {
+          "id": "c",
+          "text": "arriver"
+        },
+        {
+          "id": "d",
+          "text": "arriverez"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "arriverez",
+      "explanation": "French uses the future after quand for this future arrival."
+    },
+    {
+      "id": "q10",
+      "type": "choice",
+      "prompt": "Join the sentences with a condition: « Tu as le temps. Passe me voir. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Quand tu avais le temps, tu passais me voir."
+        },
+        {
+          "id": "b",
+          "text": "Si tu as le temps, passe me voir."
+        },
+        {
+          "id": "c",
+          "text": "Parce que tu as le temps, passe me voir."
+        },
+        {
+          "id": "d",
+          "text": "Tu as le temps parce que tu passes me voir."
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "Si tu as le temps, passe me voir.",
+      "explanation": "Si makes the invitation conditional on having time."
+    }
+  ]
+}

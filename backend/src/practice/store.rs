@@ -40,7 +40,7 @@ pub async fn answers(db: &impl GenericClient, user_id: i64, question_ids: &[i64]
 pub async fn progress(db: &impl GenericClient, user_id: i64, paper_ids: &[i64]) -> Result<HashMap<i64, Progress>> {
     let rows = db
         .query(
-            "SELECT paper_id, current_question_id, utc_iso(last_activity_at), revision
+            "SELECT paper_id, current_question_id, to_char(last_activity_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'), revision
              FROM paper_progress WHERE user_id = $1 AND paper_id = ANY($2)",
             &[&user_id, &paper_ids],
         )

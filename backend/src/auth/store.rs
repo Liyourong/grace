@@ -26,6 +26,16 @@ pub async fn init(pool: &Pool) -> Result<()> {
     let tx = db.transaction().await?;
     tx.batch_execute("SELECT pg_advisory_xact_lock(727373)").await?;
     tx.batch_execute(include_str!("credentials.sql")).await?;
+    if let Ok(hash) = std::env::var("GRACE_TEST_PASSWORD_HASH") {
+        if !hash.is_empty() {
+            let parsed = argon2::PasswordHash::new(&hash).ok();
+            if parsed.is_some_and(|p| p.algorithm.as_str() == "argon2id" && p.hash.is_some() && p.salt.is_some()) {
+                tx.execute(include_str!("seed_test_account.sql"), &[&hash]).await?;
+            } else {
+                eprintln!("Skipped shared test account creation: expected an Argon2id password hash");
+            }
+        }
+    }
     tx.commit().await?;
     Ok(())
 }
