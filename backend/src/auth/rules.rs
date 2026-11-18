@@ -1,4 +1,5 @@
-//! Account rules as pure functions: username and password rules, password hashing and checking, session tokens, cookies.
+//! Account rules as pure functions: username, password and email rules, verification codes, password hashing and
+//! checking, session tokens, cookies.
 
 use std::sync::OnceLock;
 
@@ -11,6 +12,13 @@ use rand_core::RngCore;
 use sha2::{Digest, Sha256};
 
 pub const SESSION_SECONDS: i64 = 7 * 24 * 3600;
+
+/// Wrong codes allowed per issued code; after that the registration must be started again.
+pub const MAX_FAILED_ATTEMPTS: i32 = 5;
+/// Minimum gap between two emails to the same address.
+pub const RESEND_COOLDOWN_SECONDS: i64 = 60;
+/// Emails sent for one registration (the first one plus resends).
+pub const MAX_SENDS: i32 = 5;
 
 const USERNAME_LEN: std::ops::RangeInclusive<usize> = 3..=32;
 const PASSWORD_LEN: std::ops::RangeInclusive<usize> = 8..=128;
@@ -26,6 +34,55 @@ pub fn username(raw: &str) -> Option<String> {
 /// Passwords are 8-128 characters (not bytes) and are never trimmed or otherwise altered.
 pub fn password_ok(password: &str) -> bool {
     PASSWORD_LEN.contains(&password.chars().count())
+}
+
+/// The normalized email (trimmed, lowercased), or `None` if it is not a plain ASCII `local@domain.tld` address.
+/// Deliberately stricter than RFC 5322: no quoted names, comments or IP-literal domains.
+pub fn email(raw: &str) -> Option<String> {
+    let email = raw.trim().to_ascii_lowercase();
+    if email.len() > 254 || !email.is_ascii() {
+        return None;
+    }
+    let (local, domain) = email.split_once('@')?;
+    let local_ok = (1..=64).contains(&local.len())
+        && !local.starts_with('.')
+        && !local.ends_with('.')
+        && !local.contains("..")
+        && local.bytes().all(|b| b.is_ascii_alphanumeric() || b".!#$%&'*+/=?^_`{|}~-".contains(&b));
+    let labels: Vec<&str> = domain.split('.').collect();
+    let domain_ok = labels.len() >= 2
+        && labels.iter().all(|l| {
+            (1..=63).contains(&l.len())
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
+        && labels.last().is_some_and(|tld| tld.len() >= 2);
+    (local_ok && domain_ok).then_some(email)
+}
+
+/// A random six-digit code, zeros included (`004217`), drawn without modulo bias.
+pub fn generate_code() -> String {
+    const LIMIT: u32 = 4_294_000_000; // the largest multiple of 1_000_000 that fits in a u32
+    loop {
+        let n = rand_core::OsRng.next_u32();
+        if n < LIMIT {
+            return format!("{:06}", n % 1_000_000);
+        }
+    }
+}
+
+/// The code as typed: surrounding whitespace removed, 1-32 printable characters. This is not the code's format
+/// (the demo code may be any string); a wrong code is rejected by comparison.
+pub fn code(raw: &str) -> Option<String> {
+    let code = raw.trim();
+    ((1..=32).contains(&code.chars().count()) && !code.chars().any(char::is_control)).then(|| code.to_string())
+}
+
+/// Equality that takes the same time wherever the strings differ.
+pub fn codes_match(a: &str, b: &str) -> bool {
+    let (a, b) = (Sha256::digest(a.as_bytes()), Sha256::digest(b.as_bytes()));
+    a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 /// Argon2id hash in PHC string format, with a fresh random salt. Slow on purpose: call from `spawn_blocking`.
@@ -151,5 +208,51 @@ mod tests {
     fn dummy_hash_is_valid_but_unguessable() {
         assert!(PasswordHash::new(dummy_hash()).is_ok());
         assert!(!verify_password("password", dummy_hash()));
+    }
+
+    #[test]
+    fn email_is_normalized() {
+        assert_eq!(email("  Alice.Smith+grace@Example.COM ").as_deref(), Some("alice.smith+grace@example.com"));
+    }
+
+    #[test]
+    fn email_rejects_malformed_addresses() {
+        for bad in [
+            "", "alice", "alice@", "@example.com", "alice@example", "alice@@example.com", "a@b@example.com",
+            "alice@exa mple.com", "alice smith@example.com", ".alice@example.com", "alice.@example.com",
+            "al..ice@example.com", "alice@-example.com", "alice@example-.com", "alice@example..com",
+            "alice@example.c", "<alice>@example.com", "alice@example.com,bob@example.com", "alice@exämple.com",
+            "alice@[127.0.0.1]", "\"alice\"@example.com",
+        ] {
+            assert_eq!(email(bad), None, "{bad:?}");
+        }
+        assert_eq!(email(&format!("{}@example.com", "a".repeat(65))), None);
+        assert!(email(&format!("{}@example.com", "a".repeat(64))).is_some());
+        assert_eq!(email(&format!("a@{}.com", "d".repeat(250))), None); // over 254 bytes
+    }
+
+    #[test]
+    fn generated_codes_are_six_digits() {
+        let codes: Vec<String> = (0..2000).map(|_| generate_code()).collect();
+        assert!(codes.iter().all(|c| c.len() == 6 && c.bytes().all(|b| b.is_ascii_digit())));
+        assert!(codes.iter().any(|c| c != &codes[0]), "codes should vary");
+    }
+
+    #[test]
+    fn typed_code_is_trimmed_and_bounded() {
+        assert_eq!(code(" 123456\n").as_deref(), Some("123456"));
+        assert_eq!(code("12 34"), Some("12 34".into()));
+        assert_eq!(code(""), None);
+        assert_eq!(code("   "), None);
+        assert_eq!(code(&"9".repeat(33)), None);
+        assert_eq!(code("12\u{0}34"), None);
+    }
+
+    #[test]
+    fn codes_match_only_when_equal() {
+        assert!(codes_match("004217", "004217"));
+        assert!(!codes_match("004217", "4217"));
+        assert!(!codes_match("004217", "004218"));
+        assert!(!codes_match("", "004217"));
     }
 }

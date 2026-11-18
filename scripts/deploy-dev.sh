@@ -85,7 +85,7 @@ site="$RUNNER_TEMP/registry-site"
 mkdir -p "$site"
 docker compose cp app:/app/frontend/. "$site/"
 python3 tests/check_site.py http://localhost:8090 "$site"
-python3 tests/smoke.py http://localhost:8090
+SMOKE_PSQL="docker compose exec -T db psql -U grace -d grace -v ON_ERROR_STOP=1 -q" python3 tests/smoke.py http://localhost:8090
 docker compose down --volumes
 check_head
 publish_alias "$REGISTRY_IMAGE:$version"
@@ -127,5 +127,5 @@ done
   and (.status.readyReplicas > 0 and .status.readyReplicas == .spec.replicas)'
 "${k[@]}" wait --for=jsonpath='{.status.phase}'=Bound pvc/data-db-0 --timeout=60s
 retry python3 tests/check_site.py "$base" "$site"
-python3 tests/smoke.py "$base"
+SMOKE_PSQL="kubectl -n grace exec -i statefulset/db -- psql -U grace -d grace -v ON_ERROR_STOP=1 -q" python3 tests/smoke.py "$base"
 echo "Verified $version at $base (health, assets and business checks)." >> "$GITHUB_STEP_SUMMARY"

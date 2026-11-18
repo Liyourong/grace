@@ -37,6 +37,39 @@ docs: add local dev setup instructions
 refactor(api): simplify request validation
 ```
 
+## Email verification
+
+New users register in two steps: `POST /api/auth/register` (username, password, email) emails a six-digit
+code, and `POST /api/auth/verify` (email, code) creates the account and its first session. Nothing exists in
+`users` or `sessions` until the code is accepted. Existing accounts keep signing in with username and password.
+Each registration allows 5 wrong codes and one email per address per 60 seconds, with at most 5 emails;
+a resend repeats the same code, so earlier emails stay valid.
+
+The backend reads these environment variables. In Kubernetes they come from the Secret `grace-sendgrid`
+(optional, so pods still start without it; registration answers `503` until it exists). Never commit them.
+
+| Variable | Purpose |
+| --- | --- |
+| `SENDGRID_API_KEY` | SendGrid API key |
+| `SENDGRID_FROM_EMAIL` | Sender address verified in SendGrid |
+| `DEMO_EMAIL`, `DEMO_CODE` | Optional. Together they let that one address register with the fixed code, once |
+
+Create the Secret in the cluster before merging to `dev` (the key file stays on your machine):
+
+```sh
+kubectl -n grace create secret generic grace-sendgrid \
+  --from-file=SENDGRID_API_KEY=sendgrid-api-key.txt \
+  --from-literal=SENDGRID_FROM_EMAIL='verified-sender@example.com' \
+  --from-literal=DEMO_EMAIL='demo@example.com' --from-literal=DEMO_CODE='123456'
+kubectl -n grace rollout restart deployment/app   # env from a Secret is read at start-up
+```
+
+After deploying, register a real address on the live site and confirm the email arrives. Locally, put the same
+variables in an untracked `.env` next to `compose.yaml`.
+
+The smoke tests (`tests/smoke.py`) skip registration. They create their test users and sessions directly in the
+database through the psql command in `SMOKE_PSQL` (set by CI and `scripts/deploy-dev.sh`) and delete them afterwards.
+
 ## CI and deployment
 
 A PR to `dev` runs the `verify` check on an isolated Linux runner. It runs Rust tests,
