@@ -24,6 +24,7 @@ export type Question = {
 export type Paper = {
   title: string
   description: string | null
+  revision: number
   current_question_id: string | null
   questions: Question[]
   stats: Stats

@@ -5,6 +5,8 @@ Run with python3 tests/smoke.py [BASE_URL]. Defaults to GRACE_URL or http://loca
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import hashlib
 import json
 import os
@@ -93,7 +95,15 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     base = f"/api/papers/{paper_id}"
 
     def submit(qid: str, body: dict) -> tuple[int, dict | None]:
-        return client.request("PUT", f"{base}/answers/{qid}", body)
+        return write(f"answers/{qid}", body)
+
+    def write(path: str, body: dict):
+        nonlocal revision
+        status, result = client.request("PUT", f"{base}/{path}", {**body, "expected_revision": revision})
+        if status == 200:
+            assert result["revision"] == revision + 1, result
+            revision = result["revision"]
+        return status, result
 
     def expect_stats(stats: dict, answered: int, correct: int, incorrect: int) -> None:
         assert stats == {
@@ -107,6 +117,7 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     # This is a newly uploaded, previously unanswered French sample paper.
     status, detail = client.request("GET", base)
     assert status == 200, (status, detail)
+    revision = detail["revision"]
     expect_stats(detail["stats"], 0, 0, 0)
 
     # A listed but wrong choice is valid: it must be saved and counted as wrong.
@@ -124,8 +135,8 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     expect_stats(res["stats"], 1, 1, 0)
 
     # Set a different position, then ensure an invalid submission changes neither.
-    status, body = client.request("PUT", f"{base}/position", {"question_id": "q3"})
-    assert status == 204 and body is None, (status, body)
+    status, body = write("position", {"question_id": "q3"})
+    assert status == 200 and body["revision"] == revision, (status, body)
     status, err = submit("q1", {"option_id": "z"})
     assert status == 400 and err["error"] == {
         "code": "invalid_answer", "message": "That option does not belong to this question"
@@ -134,7 +145,7 @@ def check_practice_grading(client: Client, paper_id: str) -> None:
     assert status == 400 and err["error"]["message"] == "Choice questions require option_id", (status, err)
     status, err = submit("bad!", {"option_id": "a"})
     assert status == 404 and err["error"]["code"] == "not_found", (status, err)
-    status, err = client.request("PUT", f"{base}/position", {"question_id": "bad!"})
+    status, err = write("position", {"question_id": "bad!"})
     assert status == 404 and err["error"]["code"] == "not_found", (status, err)
     status, detail = client.request("GET", base)
     assert status == 200 and detail["current_question_id"] == "q3", (status, detail)
@@ -275,8 +286,22 @@ def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
         for forbidden in ("correct_option_id", "accepted_answers", "correct_answer", "explanation"):
             assert forbidden not in q, f"unanswered question leaked {forbidden}: {q}"
 
+    fresh = Client(BASE_URL, resume_session)
+    base = f"/api/papers/{pid1}"
+    assert fresh.request("GET", base)[1]["revision"] == detail["revision"] == 0
+    for path, value in [("/position", {"question_id": "q2"}), ("/answers/q2", {"text": "Merci"})]:
+        assert fresh.request("PUT", base + path, value)[0] == 428
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        def navigate(client):
+            return client.request("PUT", base + "/position", {"question_id": "q2", "expected_revision": 0})
+        race = list(pool.map(navigate, (user_a, fresh)))
+    assert sorted(status for status, _ in race) == [200, 409], race
+    status, second = fresh.request("GET", base)
+    assert status == 200 and second["current_question_id"] == "q2" and second["revision"] == 1
+    assert second["stats"]["answered"] == 0 and second["questions"][1]["answer"] is None
+
     # Answer q2 using its preserved author ID and verify only q2 gets feedback (without internal keys).
-    status, ans_res = user_a.request("PUT", f"/api/papers/{pid1}/answers/q2", {"text": "Merci"})
+    status, ans_res = user_a.request("PUT", f"/api/papers/{pid1}/answers/q2", {"text": "Merci", "expected_revision": second["revision"]})
     assert status == 200, f"PUT answer by preserved ID q2 failed: {status} {ans_res}"
     status, detail_after = user_a.request("GET", f"/api/papers/{pid1}")
     assert status == 200, detail_after
@@ -291,9 +316,13 @@ def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
         assert "accepted_answers" not in q
     check_practice_grading(user_a, pid2)
     # Resume in a fresh browser session, at a question different from the one answered.
-    status, _ = user_a.request("PUT", f"/api/papers/{pid1}/position", {"question_id": "q3"})
-    assert status == 204, status
-    fresh = Client(BASE_URL, resume_session)
+    for path, value in [("/position", {"question_id": "q1"}), ("/answers/q2", {"text": "stale"})]:
+        status, err = fresh.request("PUT", base + path, {**value, "expected_revision": second["revision"]})
+        assert status == 409 and err["error"]["code"] == "progress_conflict", err
+    assert fresh.request("GET", base)[1] == detail_after
+    assert user_b.request("PUT", base + "/position", {"question_id": "q3", "expected_revision": 2})[0] == 404
+    status, moved = fresh.request("PUT", base + "/position", {"question_id": "q3", "expected_revision": detail_after["revision"]})
+    assert status == 200 and moved["revision"] == 3, moved
     status, restored = fresh.request("GET", f"/api/papers/{pid1}")
     assert status == 200, status
     assert restored["current_question_id"] == "q3", restored

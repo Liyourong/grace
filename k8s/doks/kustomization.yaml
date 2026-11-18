@@ -40,6 +40,12 @@ patches:
                   - name: SENDGRID_FROM_EMAIL
                     valueFrom:
                       secretKeyRef: { name: grace-sendgrid, key: SENDGRID_FROM_EMAIL, optional: false }
+                  - name: GRACE_EXPLAIN_URL
+                    valueFrom:
+                      secretKeyRef: { name: grace-explain, key: GRACE_EXPLAIN_URL }
+                  - name: GRACE_EXPLAIN_TOKEN
+                    valueFrom:
+                      secretKeyRef: { name: grace-explain, key: GRACE_EXPLAIN_TOKEN }
   # Retain: deleting the PVC by mistake keeps the DO volume (and the data) instead of destroying it.
   - target: { kind: StatefulSet, name: db }
     patch: |-

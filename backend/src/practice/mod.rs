@@ -14,7 +14,7 @@ use axum::{
     http::StatusCode,
     routing::{post, put},
 };
-use deadpool_postgres::Object;
+use deadpool_postgres::{GenericClient, Object};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -35,11 +35,26 @@ pub fn router() -> Router<AppState> {
         .route("/api/papers/{paper_id}/finish", post(finish))
 }
 
+#[derive(Deserialize)]
+struct Versioned<T> {
+    expected_revision: Option<i64>,
+    #[serde(flatten)]
+    data: T,
+}
+
+impl<T> Versioned<T> {
+    fn revision(&self) -> Result<i64> {
+        self.expected_revision.filter(|r| *r >= 0).ok_or_else(|| AppError::new(
+            StatusCode::PRECONDITION_REQUIRED, "revision_required", "Refresh the page before saving progress.",
+        ))
+    }
+}
+
 async fn save_answer(
     State(s): State<AppState>,
     user: CurrentUser,
     Path((paper_id, question_id)): Path<(String, String)>,
-    Body(submission): Body<rules::Submission>,
+    Body(body): Body<Versioned<rules::Submission>>,
 ) -> Result<Json<Value>> {
     let paper_id = parse_id(&paper_id)?;
     let mut db = s.pool.get().await?;
@@ -55,8 +70,13 @@ async fn save_answer(
     } else {
         rules::GradingKey::Text { accepted_answers: &q.accepted_answers }
     };
-    let (saved, is_correct) = rules::grade(submission, key)?;
-    let updated_at = store::save_answer(&mut db, user.id, paper_id, q.id, &saved, is_correct).await?;
+    let expected = body.revision()?;
+    let (saved, is_correct) = rules::grade(body.data, key)?;
+    let tx = db.transaction().await?;
+    let revision = store::save_position(&tx, user.id, paper_id, q.id, expected).await?;
+    let updated_at = store::save_answer(&tx, user.id, q.id, &saved, is_correct).await?;
+    let stats = stats(&tx, paper_id, user.id).await?;
+    tx.commit().await?;
     Ok(Json(json!({
         "answer": {
             "saved_answer": saved,
@@ -65,7 +85,8 @@ async fn save_answer(
             "explanation": q.explanation,
             "updated_at": updated_at,
         },
-        "stats": stats(&db, paper_id, user.id).await?,
+        "stats": stats,
+        "revision": revision,
     })))
 }
 
@@ -98,13 +119,13 @@ async fn save_position(
     State(s): State<AppState>,
     user: CurrentUser,
     Path(paper_id): Path<String>,
-    Body(body): Body<PositionBody>,
-) -> Result<StatusCode> {
+    Body(body): Body<Versioned<PositionBody>>,
+) -> Result<Json<Value>> {
     let paper_id = parse_id(&paper_id)?;
     let db = s.pool.get().await?;
-    let q = find_question(&db, paper_id, user.id, &body.question_id).await?;
-    store::save_position(&db, user.id, paper_id, q.id).await?;
-    Ok(StatusCode::NO_CONTENT)
+    let q = find_question(&db, paper_id, user.id, &body.data.question_id).await?;
+    let revision = store::save_position(&db, user.id, paper_id, q.id, body.revision()?).await?;
+    Ok(Json(json!({ "revision": revision })))
 }
 
 /// Finishing does not lock the paper or start a new round; it only reports the latest results.
@@ -125,7 +146,7 @@ async fn find_question(db: &Object, paper_id: i64, user_id: i64, question_id: &s
 }
 
 /// Results so far on a paper this user owns; 404 otherwise.
-async fn stats(db: &Object, paper_id: i64, user_id: i64) -> Result<Stats> {
+async fn stats(db: &impl GenericClient, paper_id: i64, user_id: i64) -> Result<Stats> {
     let paper = papers::get(db, paper_id, user_id).await?.ok_or_else(AppError::not_found)?;
     let saved = store::answers(db, user_id, &paper.question_ids).await?;
     Ok(Stats::of(paper.question_ids.len(), saved.values().map(|a| a.is_correct)))
