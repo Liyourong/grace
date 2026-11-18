@@ -26,7 +26,7 @@ ruby -ryaml -e '
   docs = YAML.load_stream(File.read(ARGV[0]))
   abort "Unexpected namespace" unless docs.all? { |d| d.dig("metadata", "namespace") == "grace" }
   ids = docs.to_h { |d| [[d["kind"], d.dig("metadata", "name")].join("/"), d] }
-  required = %w[Deployment/app Deployment/caddy Service/app Service/db Service/caddy StatefulSet/db HorizontalPodAutoscaler/app PersistentVolumeClaim/caddy-data]
+  required = %w[Deployment/app Deployment/caddy Service/app Service/db Service/caddy StatefulSet/db HorizontalPodAutoscaler/app PersistentVolumeClaim/caddy-data CronJob/postgres-backup]
   missing = required - ids.keys
   abort "Missing: #{missing.join(", ")}" unless missing.empty?
   containers = ids.fetch("Deployment/app").dig("spec", "template", "spec", "containers")

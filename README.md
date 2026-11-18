@@ -79,3 +79,10 @@ image and checks the public homepage and readiness. This rollback covers
 the application image. For a release that changes database schema or other
 Kubernetes resources, plan their recovery separately. Retry failed jobs
 to reuse the one-day CI artifact, or rerun all jobs if it has expired.
+
+## Database backups
+
+DOKS runs a daily `CronJob` (`postgres-backup` at 05:00 AM `America/Toronto`) that
+exports PostgreSQL with `pg_dump -Fc` and uploads private archives to DigitalOcean
+Spaces with 7-day retention. See [the DOKS backup and restore runbook](k8s/doks/README.md)
+for manual trigger, verification, and `pg_restore` recovery commands.

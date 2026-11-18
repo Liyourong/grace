@@ -4,6 +4,7 @@ namespace: grace
 resources:
   - ../base
   - caddy.yaml
+  - backup.yaml
 images:
   - name: grace
     newName: registry.digitalocean.com/grace-dev/grace
@@ -18,6 +19,9 @@ configMapGenerator:
   - name: caddyfile
     files:
       - Caddyfile
+  - name: backup-script
+    files:
+      - backup.sh
 patches:
   # Retain: deleting the PVC by mistake keeps the DO volume (and the data) instead of destroying it.
   - target: { kind: StatefulSet, name: db }
