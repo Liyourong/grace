@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, ArrowRight, ArrowUp, Check, X } from "lucide-react"
 
-import { api, type Answer, type ApiError, type ExplainResponse, type Paper, type Question, type Stats } from "@/api"
+import { api, KIND_LABEL, type Answer, type ApiError, type ExplainResponse, type Paper, type Question, type Stats } from "@/api"
 import { useStudyTime } from "@/useStudyTime"
 import { Notice } from "@/components/notice"
 import { Badge } from "@/components/ui/badge"
@@ -11,7 +11,6 @@ import { Progress } from "@/components/ui/progress"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
-const KIND_LABEL = { choice: "Multiple choice", translation: "Translation", sentence: "Sentence" }
 // shadcn has no success token; these two are the only colors outside the theme.
 const OK = "border-emerald-600/50! text-emerald-700 dark:text-emerald-400"
 const BAD = "border-destructive/50! text-destructive"

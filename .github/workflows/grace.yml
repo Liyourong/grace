@@ -36,6 +36,8 @@ jobs:
           version: ${{ env.KUBECTL_VERSION }}
       - name: Rust unit tests
         run: cargo +stable test --locked --manifest-path backend/Cargo.toml
+      - name: Test the AI function
+        run: node --test tests/generate-paper.cjs
       - name: Check the frontend
         working-directory: frontend
         run: |

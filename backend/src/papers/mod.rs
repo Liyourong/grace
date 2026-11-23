@@ -5,6 +5,7 @@
 //! Uses: `practice::answers`, `practice::progress`, `practice::Stats`, `practice::normalize`.
 
 mod folders;
+mod generate;
 mod rules;
 mod store;
 
@@ -30,6 +31,7 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/papers", get_route(list).post(upload))
+        .route("/api/papers/generate", axum::routing::post(generate::generate))
         .route("/api/papers/{paper_id}", get_route(detail).patch(folders::move_paper).delete(folders::delete_paper))
         .route("/api/folders", axum::routing::post(folders::create))
         .route("/api/folders/{folder_id}", axum::routing::patch(folders::rename).delete(folders::delete))
@@ -38,8 +40,12 @@ pub fn router() -> Router<AppState> {
 async fn upload(State(s): State<AppState>, user: CurrentUser, Body(file): Body<Value>) -> Result<(StatusCode, Json<Value>)> {
     let paper = rules::parse(&file)
         .map_err(|details| AppError::bad_request("invalid_paper_file", "The paper file is not valid").with_details(details))?;
+    save(&s, user, paper).await
+}
+
+async fn save(s: &AppState, user: CurrentUser, paper: rules::PaperFile) -> Result<(StatusCode, Json<Value>)> {
     let id = store::insert(&mut s.pool.get().await?, user.id, &paper).await?;
-    eprintln!("paper {id} uploaded by user {} ({} questions)", user.id, paper.questions.len());
+    eprintln!("paper {id} saved by user {} ({} questions)", user.id, paper.questions.len());
     Ok((
         StatusCode::CREATED,
         Json(json!({ "paper": {

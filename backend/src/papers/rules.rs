@@ -35,7 +35,8 @@ pub struct Question {
     pub explanation: String,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, serde::Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Kind {
     Choice,
     Translation,
