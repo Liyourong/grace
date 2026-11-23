@@ -19,9 +19,10 @@ export type PaperSummary = {
 }
 export type Answer = { saved_answer: string; is_correct: boolean; correct_answer: string; explanation: string }
 export type ExplainResponse = { explanation: string }
+export const KIND_LABEL = { choice: "Multiple choice", translation: "Translation", sentence: "Sentence" }
 export type Question = {
   id: string
-  kind: "choice" | "translation" | "sentence"
+  kind: keyof typeof KIND_LABEL
   prompt: string
   options: { id: string; text: string }[] | null
   answer: Answer | null

@@ -1,8 +1,6 @@
 //! Read-only external explanation of an already-saved practice answer.
 //! Function credentials live only in the backend process environment.
 
-use std::time::Duration;
-
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -70,29 +68,10 @@ fn upstream_error() -> AppError {
 
 /// Called only by the authenticated /explain route, never automatically on submissions.
 pub async fn request(payload: Payload) -> Result<String> {
-    let url = std::env::var("GRACE_EXPLAIN_URL").map_err(|_| unavailable())?;
-    let token = std::env::var("GRACE_EXPLAIN_TOKEN").map_err(|_| unavailable())?;
-    // Require HTTPS and nonempty configuration. Never include tokens in errors or logs.
-    if !url.starts_with("https://") || token.trim().is_empty() {
-        return Err(unavailable());
-    }
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(12))
-        .build()
-        .map_err(|_| unavailable())?;
-    let response = client
-        .post(url)
-        .header("X-Require-Whisk-Auth", token)
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|_| upstream_error())?;
-
-    if !response.status().is_success() {
-        return Err(upstream_error());
-    }
-    let result: FunctionResponse = response.json().await.map_err(|_| upstream_error())?;
+    let result: FunctionResponse = crate::cloud::call(&payload, 12).await.map_err(|e| match e {
+        crate::cloud::FunctionError::Unavailable => unavailable(),
+        crate::cloud::FunctionError::Upstream => upstream_error(),
+    })?;
     if result.explanation.trim().is_empty() || result.explanation.chars().count() > 8000 {
         return Err(upstream_error());
     }

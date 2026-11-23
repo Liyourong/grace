@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { FileJson, LayoutDashboard, LibraryBig, LogOut, Monitor, Moon, Plus, Sun, Upload } from "lucide-react"
+import { FileJson, LayoutDashboard, LibraryBig, LogOut, Monitor, Moon, Plus, Sparkles, Sun, Upload } from "lucide-react"
 
-import { api, type ApiError, type Library, type User } from "@/api"
+import { api, KIND_LABEL, type ApiError, type Library, type User } from "@/api"
 import { Notice } from "@/components/notice"
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
@@ -314,7 +314,7 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
   const [listFailed, setListFailed] = useState(false)
   const [screen, setScreen] = useState("overview")
   const [mobileLibrary, setMobileLibrary] = useState(false)
-  const activeId = screen === "overview" || screen === "upload" ? null : screen
+  const activeId = ["overview", "upload", "generate"].includes(screen) ? null : screen
   function select(id: string | null) {
     setScreen(id ?? "overview")
     setMobileLibrary(false)
@@ -359,6 +359,9 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
           <Button variant={screen === "upload" ? "secondary" : "ghost"} className="justify-start" onClick={openUpload}>
             <Plus /> Upload a paper
           </Button>
+          <Button variant={screen === "generate" ? "secondary" : "ghost"} aria-current={screen === "generate" ? "page" : undefined} className="justify-start" onClick={() => select("generate")}>
+            <Sparkles /> Generate a paper
+          </Button>
           <Button variant="ghost" className="md:hidden" aria-expanded={mobileLibrary} onClick={() => setMobileLibrary(!mobileLibrary)}>
             <LibraryBig /> My papers
           </Button>
@@ -382,6 +385,8 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
         <div className={cn("mx-auto grid gap-5 p-5 md:px-8 md:py-12", screen === "overview" ? "max-w-4xl" : "max-w-2xl")}>
           {activeId ? (
             <Practice key={activeId} paperId={activeId} onExpired={onExpired} onChanged={loadList} onHome={goHome} />
+          ) : screen === "generate" ? (
+            <GeneratePaper onExpired={onExpired} onChanged={loadList} onOpen={select} />
           ) : screen === "upload" ? (
             <UploadPaper onExpired={onExpired} onChanged={loadList} onOpen={select} />
           ) : library ? (
@@ -392,6 +397,75 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
         </div>
       </main>
     </div>
+  )
+}
+
+type PaperActions = { onExpired: (what: string) => void; onChanged: () => void; onOpen: (id: string) => void }
+
+function GeneratePaper({ onExpired, onChanged, onOpen }: PaperActions) {
+  const [topic, setTopic] = useState("")
+  const [count, setCount] = useState("5")
+  const [types, setTypes] = useState<string[]>([])
+  const tooManyTypes = types.length > Number(count)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+  const [saved, setSaved] = useState<{ id: string; title: string } | null>(null)
+
+  async function generate(e: React.FormEvent) {
+    e.preventDefault()
+    if (busy || !topic.trim() || tooManyTypes) return
+    setSaved(null)
+    setError("")
+    setBusy(true)
+    const result = await api<{ paper: { id: string; title: string } }>("POST", "/api/papers/generate", {
+      topic: topic.trim(), count: Number(count), question_types: types,
+    })
+    setBusy(false)
+    if (result.ok) {
+      setSaved(result.data.paper)
+      onChanged()
+    } else if (result.status === 401) {
+      onExpired("the paper could not be generated")
+    } else {
+      setError(result.uncertain ? result.error.message + " Check My papers before trying again." : result.error.message)
+    }
+  }
+
+  return (
+    <>
+      <h1 className="text-[1.75rem] leading-tight font-medium tracking-tight sm:text-[2.125rem]">Generate a paper</h1>
+      <form onSubmit={generate} className="grid gap-4">
+        <label className="grid gap-2 text-sm">Topic and level
+          <Input required maxLength={300} value={topic} disabled={busy} onChange={e => setTopic(e.target.value)}
+            placeholder="e.g. A2 French questions about travel" />
+        </label>
+        <label className="grid gap-2 text-sm">Number of questions
+          <Input type="number" className="w-24" min={1} max={10} required value={count} disabled={busy}
+            onChange={e => setCount(e.target.value)} />
+        </label>
+        <fieldset disabled={busy} className="grid gap-2 text-sm">
+          <legend className="mb-2">Question types</legend>
+          {Object.entries(KIND_LABEL).map(([type, label]) => (
+            <label key={type} className="flex items-center gap-2">
+              <input type="checkbox" checked={types.includes(type)} onChange={e => {
+                setTypes(e.target.checked ? [...types, type] : types.filter(t => t !== type))
+              }} />
+              {label}
+            </label>
+          ))}
+          <p className="text-muted-foreground">Leave all unchecked to let AI choose.</p>
+          {tooManyTypes && <p role="alert">Choose at least one question per selected type.</p>}
+        </fieldset>
+        <Button type="submit" className="justify-self-start" disabled={busy || !topic.trim() || tooManyTypes}>
+          <Sparkles /> {busy ? "Generating…" : "Generate with AI"}
+        </Button>
+      </form>
+      {busy && <p role="status" className="text-sm text-muted-foreground">Generating your paper…</p>}
+      {error && <Notice kind="error" message={error} />}
+      {saved && <Notice kind="success" message={`Saved: ${saved.title}`}>
+        <Button size="sm" variant="outline" onClick={() => onOpen(saved.id)}>Open paper</Button>
+      </Notice>}
+    </>
   )
 }
 
@@ -413,7 +487,7 @@ type UploadStatus =
   | { kind: "uncertain" }
   | { kind: "error"; error: ApiError }
 
-function UploadPaper(props: { onExpired: (what: string) => void; onChanged: () => void; onOpen: (id: string) => void }) {
+function UploadPaper(props: PaperActions) {
   const { onExpired, onChanged, onOpen } = props
   const input = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)

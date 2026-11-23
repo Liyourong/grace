@@ -98,6 +98,7 @@ Use the folder’s **…** menu to rename or delete it. Deleting a folder moves 
 | Feature | Configuration and check |
 | --- | --- |
 | Registration with real email | Obtain a SendGrid API key with mail-send access and a sender address verified in SendGrid. Set `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` in `.env`. Register a different email address you can receive mail at, then enter the six-digit code from the message. |
+| **Generate a paper** | Use the same Function URL and token as Explain. Select **Generate a paper**, enter a topic and level, choose 1–10 questions, and select any question types you want to practice. Leave all types unchecked for automatic selection. Then select **Generate with AI**. Select **Open paper** to start practicing. |
 | **Explain** on a saved answer | Obtain the team's deployed DigitalOcean Function HTTPS URL and its matching token. Set `GRACE_EXPLAIN_URL` and `GRACE_EXPLAIN_TOKEN` in `.env`. Submit an answer, then click **Explain**. Grading and saving already work with the local setup above. |
 
 After editing `.env`, run `docker compose up -d` to apply the settings.

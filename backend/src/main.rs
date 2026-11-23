@@ -7,6 +7,7 @@
 
 mod auth;
 mod common;
+mod cloud;
 mod demo_cpu;
 mod observation;
 mod papers;
