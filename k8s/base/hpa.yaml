@@ -8,6 +8,11 @@ spec:
   scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: app }
   minReplicas: 2
   maxReplicas: 5
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - { type: Pods, value: 3, periodSeconds: 15 }
   metrics:
     - type: Resource
       resource:

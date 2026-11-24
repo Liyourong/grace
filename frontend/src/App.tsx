@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { FileJson, LayoutDashboard, LibraryBig, LogOut, Monitor, Moon, Plus, Sparkles, Sun, Upload } from "lucide-react"
 
-import { api, KIND_LABEL, type ApiError, type Library, type User } from "@/api"
+import { activity, operationId, api, KIND_LABEL, type ApiError, type Library, type User } from "@/api"
 import { Notice } from "@/components/notice"
 import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
@@ -21,12 +21,15 @@ const THEMES = {
   dark: { icon: Moon, label: "Dark", next: "system" },
 } as const
 
-function ThemeButton({ className }: { className?: string }) {
+function ThemeButton({ className, signedIn }: { className?: string; signedIn?: boolean }) {
   const { theme, setTheme } = useTheme()
   const { icon: Icon, label, next } = THEMES[theme]
   const title = `Theme: ${label} (click to switch)`
   return (
-    <Button variant="ghost" size="icon-sm" className={className} title={title} aria-label={title} onClick={() => setTheme(next)}>
+    <Button variant="ghost" size="icon-sm" className={className} title={title} aria-label={title} onClick={() => {
+      setTheme(next)
+      if (signedIn) void activity("change_theme")
+    }}>
       <Icon />
     </Button>
   )
@@ -313,10 +316,27 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
   const listRequest = useRef(0)
   const [listFailed, setListFailed] = useState(false)
   const [screen, setScreen] = useState("overview")
+  const selectionGroup = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    const enter = () => {
+      const pending = new URLSearchParams(location.search).get("devops") === "1"
+      if (pending || location.hash === "#devops") {
+        location.replace("/devops/" + (pending ? location.hash : ""))
+      }
+    }
+    enter()
+    window.addEventListener("hashchange", enter)
+    return () => window.removeEventListener("hashchange", enter)
+  }, [])
   const [mobileLibrary, setMobileLibrary] = useState(false)
   const activeId = ["overview", "upload", "generate"].includes(screen) ? null : screen
   function select(id: string | null) {
-    setScreen(id ?? "overview")
+    const group=operationId()
+    selectionGroup.current=group
+    const actions={overview:"open_overview",upload:"open_upload",generate:"open_generator"} as const
+    const next=id??"overview"
+    void activity(actions[next as keyof typeof actions]??"open_paper",group)
+    setScreen(next)
     setMobileLibrary(false)
   }
   // A list request still in flight after logout must not bounce the login page with a stale "expired" message.
@@ -328,9 +348,9 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
     }
   }, [])
 
-  const loadList = useCallback(() => {
+  const loadList = useCallback((group?: string) => {
     const request = ++listRequest.current
-    return api<Library>("GET", "/api/papers").then((r) => {
+    return api<Library>("GET", "/api/papers", undefined, group).then((r) => {
       if (!alive.current || request !== listRequest.current) return
       if (r.ok) setLibrary(r.data)
       else if (r.status === 401) return onExpired("the paper list could not be loaded")
@@ -344,8 +364,9 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
   const openUpload = () => select("upload")
   useEffect(() => {
     if (screen !== "overview") return
-    window.addEventListener("focus", loadList)
-    return () => window.removeEventListener("focus", loadList)
+    const refresh = () => void loadList()
+    window.addEventListener("focus", refresh)
+    return () => window.removeEventListener("focus", refresh)
   }, [screen, loadList])
 
   return (
@@ -356,13 +377,16 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
           <Button variant={screen === "overview" ? "secondary" : "ghost"} aria-current={screen === "overview" ? "page" : undefined} className="justify-start" onClick={goHome}>
             <LayoutDashboard /> Overview
           </Button>
+          {user.devops && <Button asChild variant="ghost" className="justify-start">
+            <a href="/devops/"><Monitor /> DevOps</a>
+          </Button>}
           <Button variant={screen === "upload" ? "secondary" : "ghost"} className="justify-start" onClick={openUpload}>
             <Plus /> Upload a paper
           </Button>
           <Button variant={screen === "generate" ? "secondary" : "ghost"} aria-current={screen === "generate" ? "page" : undefined} className="justify-start" onClick={() => select("generate")}>
             <Sparkles /> Generate a paper
           </Button>
-          <Button variant="ghost" className="md:hidden" aria-expanded={mobileLibrary} onClick={() => setMobileLibrary(!mobileLibrary)}>
+          <Button variant="ghost" className="md:hidden" aria-expanded={mobileLibrary} onClick={() => {setMobileLibrary(!mobileLibrary);void activity("open_library")}}>
             <LibraryBig /> My papers
           </Button>
         </div>
@@ -375,7 +399,7 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
             {user.username[0].toUpperCase()}
           </span>
           <span className="min-w-0 flex-1 truncate text-sm">{user.username}</span>
-          <ThemeButton />
+          <ThemeButton signedIn />
           <Button variant="ghost" size="icon-sm" title="Sign out" aria-label="Sign out" onClick={onLogout}>
             <LogOut />
           </Button>
@@ -384,7 +408,7 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div className={cn("mx-auto grid gap-5 p-5 md:px-8 md:py-12", screen === "overview" ? "max-w-4xl" : "max-w-2xl")}>
           {activeId ? (
-            <Practice key={activeId} paperId={activeId} onExpired={onExpired} onChanged={loadList} onHome={goHome} />
+            <Practice key={activeId} paperId={activeId} group={selectionGroup} onExpired={onExpired} onChanged={loadList} onHome={goHome} />
           ) : screen === "generate" ? (
             <GeneratePaper onExpired={onExpired} onChanged={loadList} onOpen={select} />
           ) : screen === "upload" ? (
@@ -392,7 +416,7 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
           ) : library ? (
             <Overview library={library} open={select} upload={openUpload} />
           ) : (
-            <p role="status">{listFailed ? <button className="underline" onClick={loadList}>Retry loading overview</button> : "Loading overview…"}</p>
+            <p role="status">{listFailed ? <button className="underline" onClick={() => void loadList()}>Retry loading overview</button> : "Loading overview…"}</p>
           )}
         </div>
       </main>
@@ -400,7 +424,7 @@ function Shell(props: { user: User; onLogout: () => void; onExpired: (what: stri
   )
 }
 
-type PaperActions = { onExpired: (what: string) => void; onChanged: () => void; onOpen: (id: string) => void }
+type PaperActions = { onExpired: (what: string) => void; onChanged: (group?:string) => void; onOpen: (id: string) => void }
 
 function GeneratePaper({ onExpired, onChanged, onOpen }: PaperActions) {
   const [topic, setTopic] = useState("")
@@ -417,13 +441,14 @@ function GeneratePaper({ onExpired, onChanged, onOpen }: PaperActions) {
     setSaved(null)
     setError("")
     setBusy(true)
+    const group=operationId()
     const result = await api<{ paper: { id: string; title: string } }>("POST", "/api/papers/generate", {
       topic: topic.trim(), count: Number(count), question_types: types,
-    })
+    },group)
     setBusy(false)
     if (result.ok) {
       setSaved(result.data.paper)
-      onChanged()
+      onChanged(group)
     } else if (result.status === 401) {
       onExpired("the paper could not be generated")
     } else {
@@ -448,6 +473,7 @@ function GeneratePaper({ onExpired, onChanged, onOpen }: PaperActions) {
           {Object.entries(KIND_LABEL).map(([type, label]) => (
             <label key={type} className="flex items-center gap-2">
               <input type="checkbox" checked={types.includes(type)} onChange={e => {
+                void activity("select_question_types")
                 setTypes(e.target.checked ? [...types, type] : types.filter(t => t !== type))
               }} />
               {label}
@@ -495,6 +521,7 @@ function UploadPaper(props: PaperActions) {
   const [over, setOver] = useState(false)
 
   function choose(f: File | undefined) {
+    if (f) void activity("select_upload_file")
     setFile(f ?? null)
     setStatus(null)
   }
@@ -508,13 +535,14 @@ function UploadPaper(props: PaperActions) {
     } catch {
       return setStatus({ kind: "error", error: { code: "read", message: "Couldn't read the local file. Please choose it again." } })
     }
-    const r = await api<{ paper: { id: string; title: string; question_count: number } }>("POST", "/api/papers", text)
+    const group=operationId()
+    const r = await api<{ paper: { id: string; title: string; question_count: number } }>("POST", "/api/papers", text,group)
     if (r.ok) {
       const p = r.data.paper
       if (input.current) input.current.value = ""
       setFile(null)
       setStatus({ kind: "saved", id: p.id, title: p.title, count: p.question_count })
-      onChanged()
+      onChanged(group)
     } else if (r.status === 401) {
       onExpired("the paper was not uploaded")
     } else if (r.uncertain) {
@@ -586,7 +614,7 @@ function UploadPaper(props: PaperActions) {
           kind="error"
           message="We couldn't confirm whether the paper was saved. Check the list first; uploading again creates a separate new paper."
         >
-          <Button variant="outline" size="sm" onClick={onChanged}>
+          <Button variant="outline" size="sm" onClick={()=>onChanged()}>
             Refresh list
           </Button>
         </Notice>

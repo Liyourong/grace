@@ -43,7 +43,11 @@ static ANSWERS: Mutex<Answers> = Mutex::new(Answers {
     seconds: 0.0,
 });
 
-pub async fn record(req: Request, next: Next) -> Response {
+pub async fn record(
+    axum::extract::State(state): axum::extract::State<crate::common::AppState>,
+    req: Request,
+    next: Next,
+) -> Response {
     let route = req.extensions().get::<MatchedPath>().cloned();
     let route = route.as_ref().map(MatchedPath::as_str);
     let answer =
@@ -64,6 +68,13 @@ pub async fn record(req: Request, next: Next) -> Response {
     let mut id = [0; 16];
     OsRng.fill_bytes(&mut id);
     let id = hex::encode(id);
+    let group = req
+        .headers()
+        .get("x-grace-operation")
+        .and_then(|v| v.to_str().ok())
+        .filter(|v| v.len() == 32 && v.bytes().all(|c| c.is_ascii_hexdigit()))
+        .unwrap_or(&id)
+        .to_owned();
     let start = Instant::now();
     let detailed = answer || (route == Some("/api/auth/login") && method == "POST");
     let (mut response, steps) = if detailed {
@@ -92,11 +103,29 @@ pub async fn record(req: Request, next: Next) -> Response {
     } else {
         None
     };
-    println!(
-        "{}",
-        json!({"event":"grace.request","rejected_at":rejected_at,"id":id,"time":finished,"us":elapsed.as_micros() as u64,
-        "method":method,"route":route,"status":response.status().as_u16(),"steps":steps})
-    );
+    let route = route.unwrap_or("unknown");
+    // Successful console refreshes must not bury the operation the presenter is inspecting.
+    if !response.status().is_success()
+        || !matches!(
+            route,
+            "/api/devops/logs" | "/api/devops/cluster/{resource}" | "/api/devops/access"
+        )
+    {
+        let label = response
+            .extensions()
+            .get::<crate::devops::ActionName>()
+            .map(|a| a.0)
+            .or_else(|| crate::operations::name(&method, route))
+            .unwrap_or("API request");
+        let event = json!({"event":"grace.request","rejected_at":rejected_at,"id":id,"time":finished,"us":elapsed.as_micros() as u64,
+            "method":method,"route":route,"status":response.status().as_u16(),"steps":steps,"operation":label,"group":group,
+            "pod":std::env::var("HOSTNAME").unwrap_or_else(|_|"app".into()),"environment":crate::devops::environment()});
+        println!("{event}");
+        if let Err(err) = save_log(&state.pool, &event).await {
+            eprintln!("operation log queued after database error: {err:?}");
+            queue_retry(state.pool.clone(), event);
+        }
+    }
 
     if answer {
         let mut a = ANSWERS.lock().unwrap();
@@ -127,4 +156,33 @@ pub async fn start_metrics() {
     tokio::spawn(async move {
         axum::serve(socket, metrics).await.expect("serve metrics");
     });
+}
+
+async fn save_log(
+    pool: &deadpool_postgres::Pool,
+    event: &serde_json::Value,
+) -> crate::common::Result<()> {
+    pool.get().await?.execute("INSERT INTO operation_log(request_id,occurred_at,entry)
+        VALUES ($1,to_timestamp(($2::bigint)::double precision/1000),$3) ON CONFLICT(request_id) DO NOTHING",
+        &[&event["id"].as_str().unwrap(),&(event["time"].as_u64().unwrap() as i64),event]).await?;
+    Ok(())
+}
+
+fn queue_retry(pool: deadpool_postgres::Pool, event: serde_json::Value) {
+    static QUEUE: std::sync::OnceLock<tokio::sync::mpsc::Sender<serde_json::Value>> =
+        std::sync::OnceLock::new();
+    let tx = QUEUE.get_or_init(|| {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(2048);
+        tokio::spawn(async move {
+            while let Some(event) = rx.recv().await {
+                while save_log(&pool, &event).await.is_err() {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                }
+            }
+        });
+        tx
+    });
+    if tx.try_send(event).is_err() {
+        eprintln!("operation log retry buffer full; see structured pod logs");
+    }
 }

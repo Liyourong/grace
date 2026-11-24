@@ -1,8 +1,14 @@
 "use strict";
 const audience = document.documentElement.hasAttribute("data-viewer");
-if (!audience && location.origin === "http://127.0.0.1:19090" && /^#presenter=[a-f0-9]{64}$/.test(location.hash)) {
-  localStorage.setItem("grace.presenter", location.hash.slice("#presenter=".length));
-  history.replaceState(null, "", "/#topology-view");
+const environment = document.documentElement.dataset.environment;
+const clusterEnabled = audience || environment !== "Compose";
+function activity(action) {
+  if (!audience) fetch("/api/activity", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action})}).catch(() => {});
+}
+async function operatorFetch(path, options) {
+  const res = await fetch(path, options);
+  if (res.status === 401 || res.status === 403) location.replace("/devops/" + location.hash);
+  return res;
 }
 const $ = (id) => document.getElementById(id);
 const colors = ["#a9c5eb", "#afa4cd", "#e0b481", "#93bcae", "#e398a1"];
@@ -30,6 +36,7 @@ function box(parent, x, y, width, height, fill, stroke) {
   return svg("rect", { x, y, width, height, rx: 5, fill, stroke }, parent);
 }
 function choose(node) {
+  activity("filter_worker");
   selection = node;
   $("worker").value = node;
   drawMap(false);
@@ -428,20 +435,22 @@ const panels = [
   ["Answer failure rate", "%", ["failures"]],
   ["Answer latency · mean", "ms", ["latency"]],
 ];
-function plot(el, lines, start, end, unit, step = 15) {
+function plot(el, lines, start, end, unit, step = 15, target = null) {
   el.replaceChildren();
   el.setAttribute("viewBox", "0 0 300 65");
   el.setAttribute("preserveAspectRatio", "none");
   const values = lines
     .flatMap((line) => line.points.map((p) => p[1]))
     .filter(Number.isFinite);
-  const max = Math.max(1, ...values);
+  const max = Math.max(1, target ?? 0, ...values);
   const x = (t) => ((t - start) / (end - start)) * 296 + 2,
     y = (v) => 59 - (v / max) * 52;
   for (const yy of [7, 59])
     svg("line", { x1: 0, x2: 300, y1: yy, y2: yy, stroke: "#363941" }, el);
+  if (Number.isFinite(target))
+    svg("line", { x1: 0, x2: 300, y1: y(target), y2: y(target), stroke: "#e0b481", "stroke-dasharray": "4 3" }, el);
   if (
-    view.run &&
+    target === null && view.run &&
     view.run.started / 1000 >= start &&
     view.run.started / 1000 <= end
   )
@@ -482,6 +491,41 @@ function plot(el, lines, start, end, unit, step = 15) {
     svg("title", {}, line, l.name + " · " + unit);
   });
   return values.length > 0;
+}
+function drawAppCpu() {
+  if (!view || !clusterEnabled) return;
+  const hpa = view.resources.hpa?.app;
+  const target = hpa?.target;
+  const cpu = streamLive && view.synced.hpa ? hpa?.cpu : null;
+  $("appCpu").textContent = Number.isFinite(cpu) ? cpu + "%" : "—";
+  $("cpuTarget").textContent = "Target " + (Number.isFinite(target) ? target + "%" : "—");
+
+  const end = Date.now() / 1000;
+  const points = (metrics?.series?.hpaCpu?.[0]?.values || [])
+    .map(([t, v]) => [t, Number(v)])
+    .filter(([t, v]) => t >= end - 300 && t < end && Number.isFinite(v));
+  const hasHistory = points.length > 0;
+  const test = view.load_test;
+  const warning = test?.cpu_warning;
+  if (warning && warning.time / 1000 >= end - 300 && warning.time / 1000 <= end) {
+    points.push([warning.time / 1000, warning.cpu]);
+    points.sort((a, b) => a[0] - b[0]);
+  }
+  if (Number.isFinite(cpu)) points.push([end, cpu]);
+  plot($("appCpuPlot"), [{name:"App CPU", points}], end - 300, end, "% of request", 15, target);
+  $("cpuCaption").textContent = !Number.isFinite(cpu) ? "Waiting for current HPA metrics." :
+    hasHistory ? "5 min · average % of requested CPU" : "Live HPA reading · waiting for history";
+
+  const notice = $("cpuNotice");
+  notice.hidden = !warning;
+  if (!warning) return;
+  const title = warning.time === test.started ? "CPU already above target at start" : "CPU above HPA target";
+  const decision = test.first_desired != null
+    ? time(test.started + test.first_scale_ms) + " · HPA requested " + test.initial + " → " + test.first_desired + " pods"
+    : test.phase === "running" ? "Waiting for HPA to request more pods." : "No scale-up observed during this test.";
+  const detail = time(warning.time) + " · " + warning.cpu + "% vs " + warning.target + "% target\n" + decision;
+  if ($("cpuNoticeTitle").textContent !== title) $("cpuNoticeTitle").textContent = title;
+  if ($("cpuNoticeDetail").textContent !== detail) $("cpuNoticeDetail").textContent = detail;
 }
 function drawFlow() {
   const end = metrics?.end ?? Date.now() / 1000;
@@ -574,6 +618,7 @@ function drawResourceStrip() {
   }
 }
 function drawCharts() {
+  drawAppCpu();
   drawFlow();
   drawResourceStrip();
   if (audience) return;
@@ -686,6 +731,8 @@ function drawLoadTest() {
   };
   $("loadStatus").textContent =
     (ready ?? "—") + " / 5 ready · " + (loadError || messages[test.phase]);
+  const seconds = ms => ms == null ? "—" : (ms / 1000).toFixed(1) + " s";
+  $("loadTimings").textContent = "First scale " + seconds(test.first_scale_ms) + "  ·  Five ready " + seconds(test.ready_ms);
   const button = $("loadButton");
   button.textContent = running ? "Stop load test" : "Start load test";
   button.disabled =
@@ -704,14 +751,10 @@ $("loadButton").onclick = async () => {
   const command = view.load_test.phase === "running" ? "stop" : "start";
   drawLoadTest();
   try {
-    const result = await fetch("/api/load-test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(localStorage.getItem("grace.presenter") && {Authorization: "Bearer " + localStorage.getItem("grace.presenter")}) },
-      body: JSON.stringify(command),
-    });
+    const result = await operatorFetch("/api/devops/load/" + command, {method:"POST"});
     if (!result.ok)
       loadError =
-        result.status === 401 ? "Open your private presenter link to unlock this browser." : result.status === 409
+        result.status === 409
           ? "Waiting for HPA or scale-down."
           : "Load control unavailable (" + result.status + ").";
   } catch {
@@ -722,6 +765,7 @@ $("loadButton").onclick = async () => {
   }
 };
 function showSync() {
+  drawAppCpu();
   drawLoadTest();
   const ok =
     streamLive &&
@@ -746,12 +790,16 @@ function selectView() {
     else link.removeAttribute("aria-current");
   }
 }
-window.addEventListener("hashchange", selectView);
+window.addEventListener("hashchange", () => {
+  selectView();
+  const action = {"#topology-view":"view_topology","#metrics-view":"view_metrics","#health-view":"view_readiness","#logs-view":"view_logs"}[location.hash];
+  if (action) activity(action);
+});
 selectView();
 $("overview").onclick = () => {
   if (view) choose("");
 };
-const feed = new EventSource("/api/events");
+const feed = clusterEnabled ? new EventSource(audience ? "/api/events" : "/api/devops/cluster/events") : null;
 function recordContact() {
   lastContact = Date.now();
   streamLive = true;
@@ -764,8 +812,8 @@ function contactLost() {
   streamLive = false;
   showSync();
 }
-feed.addEventListener("heartbeat", recordContact);
-feed.onmessage = (e) => {
+feed?.addEventListener("heartbeat", recordContact);
+if (feed) feed.onmessage = (e) => {
   const next = JSON.parse(e.data),
     changedRun = next.run?.started !== view?.run?.started;
   if (changedRun) seen.clear();
@@ -785,11 +833,11 @@ feed.onmessage = (e) => {
   }
   drawHealth();
 };
-feed.onerror = contactLost;
+if (feed) feed.onerror = contactLost;
 $("worker").onchange = (e) => choose(e.target.value);
 async function fetchMetrics() {
   try {
-    const res = await fetch("/api/metrics");
+    const res = audience ? await fetch("/api/metrics") : await operatorFetch("/api/devops/cluster/metrics");
     if (!res.ok) throw Error();
     metrics = await res.json();
   } catch {
@@ -801,6 +849,14 @@ async function fetchMetrics() {
   }
   setTimeout(fetchMetrics, 15000);
 }
-fetchMetrics();
-
-if (!audience && location.port === "19090") import("/logs.js");
+if (clusterEnabled) fetchMetrics();
+else {
+  $("sync").textContent = "Docker Compose";
+  $("updated").textContent = "Cluster topology requires Kubernetes.";
+  $("range").textContent = "Cluster metrics require Kubernetes.";
+  $("health").textContent = "The cluster probe requires Kubernetes.";
+}
+if (!audience) {
+  activity("open_devops");
+  import("./logs.js").then(selectView);
+}

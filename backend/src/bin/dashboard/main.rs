@@ -1,7 +1,6 @@
 mod cluster;
 mod load_test;
 mod metrics;
-mod logs;
 
 use axum::{
     Json, Router,
@@ -217,6 +216,18 @@ fn event_stream(s: Store, viewer: bool) -> impl IntoResponse {
             .event(Event::default().event("heartbeat").data("ok")),
     )
 }
+async fn presentation_link() -> Result<Html<String>, StatusCode> {
+    let origin = std::env::var("GRACE_APP_ORIGIN").unwrap_or_else(|_| "http://localhost:8090".into());
+    let url = reqwest::Url::parse(&origin).map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
+    let origin = url.origin().ascii_serialization();
+    Ok(Html(format!(r##"<!doctype html><title>Grace Operations</title>
+<a href="{origin}/devops/">Open Grace Operations</a>
+<script>const tab = ["#topology-view","#metrics-view","#health-view","#logs-view"].includes(location.hash) ? location.hash : "";
+location.replace(document.querySelector("a").href + tab);</script>"##)))
+}
 #[tokio::main]
 async fn main() {
     let url = std::env::var("UPTIME_URL")
@@ -232,8 +243,7 @@ async fn main() {
     for kind in KINDS {
         tokio::spawn(cluster::observe(kube.clone(), store.clone(), kind));
     }
-    let logs = logs::Logs::default();
-    tokio::spawn(cluster::observe_logs(kube, store.clone(), logs.clone()));
+    tokio::spawn(cluster::observe_logs(kube, store.clone()));
     let assets = Router::new()
         .route(
             "/app.js",
@@ -266,21 +276,20 @@ async fn main() {
         .route("/api/snapshot", get(viewer_snapshot))
         .route("/api/metrics", get(metrics::viewer_ranges))
         .with_state(store.clone());
-    let mut app = assets.merge(logs::router(logs))
-        .route("/logs.js", get(|| async {
-            ([("content-type","application/javascript")], include_str!("../../../../dashboard/logs.js"))
-        }))
-        .route("/", get(|| async { Html(PAGE) }))
-        .route("/health/ready", get(ready))
+    let mut private = Router::new()
         .route("/api/snapshot", get(snapshot))
         .route("/api/events", get(events))
         .route("/api/metrics", get(metrics::ranges));
     if load_test::enabled() {
-        app = app.route(
-            "/api/load-test",
-            get(load_test::lease).post(load_test::control),
-        );
+        private = private.route("/internal/operator-load", post(load_test::operator_control));
         tokio::spawn(load_test::monitor(store.clone()));
+    }
+    let mut app = Router::new()
+        .route("/", get(presentation_link))
+        .route("/health/ready", get(ready))
+        .merge(private.route_layer(axum::middleware::from_fn(load_test::session_guard)));
+    if load_test::enabled() {
+        app = app.route("/api/load-test", get(load_test::lease));
     }
     let app = app.with_state(store.clone());
     let demo = Router::new()

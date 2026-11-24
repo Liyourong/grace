@@ -31,6 +31,9 @@ pub async fn init(pool: &Pool) -> Result<()> {
             let parsed = argon2::PasswordHash::new(&hash).ok();
             if parsed.is_some_and(|p| p.algorithm.as_str() == "argon2id" && p.hash.is_some() && p.salt.is_some()) {
                 tx.execute(include_str!("seed_test_account.sql"), &[&hash]).await?;
+                // A matching provisioned credential identifies legacy seeded accounts too.
+                tx.execute("INSERT INTO devops_operator SELECT user_id FROM auth_credentials
+                    WHERE username='grace_test' AND password_hash=$1 ON CONFLICT DO NOTHING", &[&hash]).await?;
             } else {
                 eprintln!("Skipped shared test account creation: expected an Argon2id password hash");
             }

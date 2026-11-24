@@ -25,6 +25,10 @@ const QUERIES: &[(&str, &str)] = &[
         "sum by(node)(rate(node_network_transmit_bytes_total{job=\"grace-nodes\",device!~\"lo|veth.*|cali.*|cni.*|docker.*|br-.*|flannel.*\"}[2m]))",
     ),
     (
+        "hpaCpu",
+        r#"max(kube_horizontalpodautoscaler_status_target_metric{namespace="grace",horizontalpodautoscaler="app",metric_name="cpu",metric_target_type="utilization"})"#,
+    ),
+    (
         "podIn",
         r#"sum(max by(pod,interface)(irate(container_network_receive_bytes_total{job="kubernetes-nodes-cadvisor",namespace="grace",pod=~"app-.+",interface!="lo",interface!=""}[2m])))"#,
     ),
@@ -93,7 +97,7 @@ async fn query(viewer: bool, end: u64) -> ResultSet {
         QUERIES
             .iter()
             .filter(|(key, _)| {
-                !viewer || matches!(*key, "cpu" | "memory" | "root" | "podIn" | "podOut")
+                !viewer || matches!(*key, "cpu" | "memory" | "root" | "hpaCpu" | "podIn" | "podOut")
             })
             .map(|(key, query)| {
                 let req = client.get(&url).query(&[

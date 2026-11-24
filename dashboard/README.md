@@ -11,36 +11,23 @@ CTX=grace-dash-demo
 kubectl --context "$CTX" -n grace port-forward deployment/grace-dashboard 9090:9090 9091:9091
 ```
 
-Open **http://localhost:9090**. Leave the terminal running. Port 9090 serves the page. Port 9091 accepts timings only on the Pod's loopback interface. Forward both ports to the same Pod. If Kubernetes replaces the dashboard Pod, restart the forward. A browser refresh restores the running Pod's latest batch.
+Open **http://localhost:9090**. The link opens the full Operations dashboard on the Grace application origin. Sign in as `grace_test` if prompted. Direct links to Topology, Metrics, Readiness and Logs keep the selected tab through sign-in. The Grace home page opens the same dashboard. For local port-forwards, set `GRACE_APP_ORIGIN` when running the dashboard installer if the application URL differs from the first configured application origin. Port 9091 accepts the demo client’s timings on Pod loopback. Restart the forward if the dashboard Pod is replaced.
 
-## Private request logs and traces
+## Operations views
 
-Open **Logs** on the presenter console at **http://127.0.0.1:19090/#logs-view** after unlocking the browser. It refreshes every two seconds while visible. Filter the most recent 500 business requests by Pod, HTTP status or Trace ID. Select a request to see timing from the Grace app. Login and answer submissions include measured steps. A failed step marks where processing stopped. The application also returns the ID in the `X-Trace-Id` response header.
+**Topology** shows the number of ready replicas, time to the first HPA increase and time to five ready replicas beside the load test button. The Minikube rehearsal samples CPU every 15 seconds and uses a 60-second scale-down stabilization window. DOKS uses its installed metrics provider.
 
-The Dashboard holds this history in memory across app Pod replacements. A Dashboard restart can lose older entries. The private APIs require the loopback forward and presenter key even with CPU rehearsal disabled. The public site has no logs or trace endpoints.
+The right sidebar charts average application CPU as a percentage of the Pods’ CPU requests. The dashed line shows the configured HPA target. During a load test the first observed reading above target is marked in amber. The HPA replica request and Pod creation events have their own timestamps.
 
-## Public viewer and private presenter
+**Logs** reads seven days of application operations from PostgreSQL. Filter by Pod, status or Trace ID and page through matching operations. Select an answer submission or login to inspect its processing steps. The application returns the same ID in the `X-Trace-Id` header. Prompts, passwords and answer text are excluded from the log.
 
-Share **https://status.146-190-191-107.sslip.io/** with viewers. Caddy forwards only the static page, cluster snapshots, event stream and charts to a separate read-only listener on port 9092. Prometheus queries for the viewer are shared across viewers for each 15-second sample. The viewer excludes login traces, presenter probes and load controls.
+**Readiness** includes the presenter probe and **Database persistence**. Submit an answer as the test account, select the environment, then copy and run each step separately. Compare the PostgreSQL start time, question ID and saved answer before and after the restart. Reload the Grace paper to show the saved answer. The cloud command briefly interrupts database service.
 
-On DOKS the presenter uses the loopback port-forward on 19090 and a personal key. Open your private presenter link once per browser. The fragment stays on your computer, is removed from the address bar, and the browser remembers the key for this origin. Kubernetes stores only its SHA-256 verifier. Keep the presenter file private. To provision a new presenter on a fresh cluster, run the following on the presenter's Mac before enabling demo mode:
-
-```bash
-(
-  set -eu
-  umask 077
-  file=$(mktemp "$HOME/Downloads/Grace-presenter-XXXXXX")
-  key=$(openssl rand -hex 32)
-  printf 'http://127.0.0.1:19090/#presenter=%s\n' "$key" > "$file"
-  verifier=$(printf %s "$key" | shasum -a 256 | cut -d' ' -f1)
-  kubectl --context do-tor1-grace -n grace create configmap grace-dashboard-presenter --from-literal=sha256="$verifier"
-  echo "Private presenter link saved in $file"
-)
-```
+The public status site still serves read-only cluster information from port 9092. Privileged data and controls use the test account’s Grace session.
 
 ## One-click HPA test
 
-On the **Topology** tab click **Start load test**. Each Grace app Pod runs a fixed 300 ms CPU sample followed by a 700 ms pause. The dashboard stops issuing samples when five replicas are available, after three minutes, or when you click **Stop load test**. Closing the tab leaves the server-side time limit in effect. Watch the node boxes for new Pods and the **Metrics** view for replica counts. After Kubernetes scales back down you can run the test again.
+On the **Topology** tab click **Start load test**. Each Grace app Pod requests a lease, runs an 800 ms CPU sample, and pauses for 200 ms. Set `GRACE_HPA_FAST=0` on the app to reproduce the previous 300 ms sample and 700 ms pause. The dashboard stops issuing samples when five replicas are available, after three minutes, or when you click **Stop load test**. Closing the tab leaves the server-side time limit in effect. Watch the node boxes for new Pods and the **Metrics** view for replica counts. After Kubernetes scales back down you can run the test again.
 
 The install script enables this control for the local `grace-dash-demo` profile by default. On DOKS, an operator can enable it for a rehearsal as described below. Open the dashboard through its localhost port-forward on port 9090 (minikube) or 19090 (DOKS). Both the app and dashboard must use the image that includes the CPU test. The button exercises CPU-based autoscaling independently of the login timeline.
 
@@ -75,7 +62,7 @@ The load uses two login workers. Each worker logs out and pauses between logins.
 
 ## Install on minikube or DOKS
 
-Use a cluster that already runs the instrumented version of Grace from this checkout. Its image contains both the Grace and dashboard binaries. The PostgreSQL schema is unchanged. The monitoring install uses Helm 3, kubectl, jq, and an operator account with permission to create read roles. The existing application release remains a separate operation.
+Use a cluster that already runs the instrumented version of Grace from this checkout. Its image contains both the Grace and dashboard binaries. The monitoring install uses Helm 3, kubectl, jq, and an operator account with permission to create read roles. The existing application release remains a separate operation.
 
 For a new local rehearsal, use the existing minikube application setup with a dedicated profile. The initial steps below prepare a fresh two-node profile.
 

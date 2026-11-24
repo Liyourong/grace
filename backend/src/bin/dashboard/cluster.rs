@@ -177,7 +177,8 @@ async fn list_watch(k: &Kube, s: &Store, kind: &str) -> Result<(), Fault> {
         }
         v.resources.insert(kind.into(), group);
         v.synced.insert(kind.into(), true);
-        v.updated = now()
+        v.updated = now();
+        if kind == "hpa" { super::load_test::finish(v, v.updated); }
     });
     let resp = k
         .get(
@@ -217,7 +218,8 @@ async fn list_watch(k: &Kube, s: &Store, kind: &str) -> Result<(), Fault> {
                 false
             };
             if changed {
-                v.updated = now()
+                v.updated = now();
+                if kind == "hpa" { super::load_test::finish(v, v.updated); }
             }
             changed
         });
@@ -234,7 +236,7 @@ pub async fn observe(k: Kube, s: Store, kind: &'static str) {
         }
     }
 }
-async fn log_tail(k: Kube, s: Store, pod: String, logs: super::logs::Logs) {
+async fn log_tail(k: Kube, s: Store, pod: String) {
     let path = format!("/api/v1/namespaces/grace/pods/{pod}/log");
     loop {
         if let Ok(resp) = k
@@ -253,10 +255,6 @@ async fn log_tail(k: Kube, s: Store, pod: String, logs: super::logs::Logs) {
                 let Ok(v) = serde_json::from_slice::<Value>(line) else {
                     return Ok(());
                 };
-                if v["event"] == "grace.request" {
-                    logs.ingest(&pod, v);
-                    return Ok(());
-                }
                 if v["event"] != "grace.demo.login" {
                     return Ok(());
                 }
@@ -282,7 +280,7 @@ async fn log_tail(k: Kube, s: Store, pod: String, logs: super::logs::Logs) {
         sleep(Duration::from_secs(1)).await;
     }
 }
-pub async fn observe_logs(k: Kube, s: Store, logs: super::logs::Logs) {
+pub async fn observe_logs(k: Kube, s: Store) {
     let mut rx = s.subscribe();
     let mut tasks: HashMap<String, JoinHandle<()>> = HashMap::new();
     loop {
@@ -306,7 +304,7 @@ pub async fn observe_logs(k: Kube, s: Store, logs: super::logs::Logs) {
         for pod in pods {
             tasks
                 .entry(pod.clone())
-                .or_insert_with(|| tokio::spawn(log_tail(k.clone(), s.clone(), pod, logs.clone())));
+                .or_insert_with(|| tokio::spawn(log_tail(k.clone(), s.clone(), pod)));
         }
         if rx.changed().await.is_err() {
             break;

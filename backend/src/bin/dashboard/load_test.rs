@@ -1,11 +1,7 @@
 use super::{Store, View, now};
-use axum::{
-    Json,
-    extract::{ConnectInfo, State},
-    http::{HeaderMap, StatusCode},
-};
+use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, time::Duration};
+use std::time::Duration;
 
 #[derive(Clone, Copy, Serialize, PartialEq, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -19,15 +15,34 @@ pub enum Phase {
 }
 
 #[derive(Clone, Serialize)]
+struct CpuWarning {
+    time: u64,
+    cpu: u64,
+    target: u64,
+}
+
+#[derive(Clone, Serialize)]
 pub struct Test {
     phase: Phase,
     deadline: u64,
+    started: u64,
+    initial: u64,
+    cpu_warning: Option<CpuWarning>,
+    first_desired: Option<u64>,
+    first_scale_ms: Option<u64>,
+    ready_ms: Option<u64>,
 }
 impl Default for Test {
     fn default() -> Self {
         Self {
             phase: Phase::Idle,
             deadline: 0,
+            started: 0,
+            initial: 0,
+            cpu_warning: None,
+            first_desired: None,
+            first_scale_ms: None,
+            ready_ms: None,
         }
     }
 }
@@ -52,7 +67,14 @@ fn observed(view: &View) -> bool {
         && available(view).is_some()
 }
 
-fn finish(view: &mut View, time: u64) -> bool {
+fn above_target(hpa: Option<&serde_json::Value>, time: u64) -> Option<CpuWarning> {
+    let hpa = hpa?;
+    let cpu = hpa["cpu"].as_u64()?;
+    let target = hpa["target"].as_u64()?;
+    (target > 0 && cpu > target).then_some(CpuWarning { time, cpu, target })
+}
+
+pub(super) fn finish(view: &mut View, time: u64) -> bool {
     if !view
         .load_test
         .as_ref()
@@ -60,16 +82,35 @@ fn finish(view: &mut View, time: u64) -> bool {
     {
         return false;
     }
-    let phase = if !observed(view) {
+    let hpa = view.resources.get("hpa").and_then(|group| group.get("app"));
+    let desired = hpa.and_then(|h| h["desired"].as_u64());
+    let synced = observed(view);
+    let test = view.load_test.as_mut().unwrap();
+    let mut warning = false;
+    if synced && test.cpu_warning.is_none() {
+        test.cpu_warning = above_target(hpa, time);
+        warning = test.cpu_warning.is_some();
+    }
+    let first =
+        synced && test.first_scale_ms.is_none() && desired.is_some_and(|n| n > test.initial);
+    if first {
+        test.first_scale_ms = Some(time.saturating_sub(test.started));
+        test.first_desired = desired;
+    }
+    let phase = if !synced {
         Phase::Interrupted
     } else if available(view) >= Some(5) {
         Phase::Reached
     } else if time >= view.load_test.as_ref().unwrap().deadline {
         Phase::TimedOut
     } else {
-        return false;
+        return first || warning;
     };
-    view.load_test.as_mut().unwrap().phase = phase;
+    let test = view.load_test.as_mut().unwrap();
+    if phase == Phase::Reached {
+        test.ready_ms = Some(time.saturating_sub(test.started));
+    }
+    test.phase = phase;
     true
 }
 pub async fn monitor(s: Store) {
@@ -99,6 +140,11 @@ pub enum Command {
 }
 
 fn change(view: &mut View, cmd: Command, time: u64) -> StatusCode {
+    let hpa = view.resources.get("hpa").and_then(|group| group.get("app"));
+    let initial = hpa
+        .and_then(|h| h["desired"].as_u64())
+        .or_else(|| available(view))
+        .unwrap_or(0);
     let can_start = observed(view) && available(view) < Some(5);
     let Some(test) = view.load_test.as_mut() else {
         return StatusCode::NOT_FOUND;
@@ -107,6 +153,12 @@ fn change(view: &mut View, cmd: Command, time: u64) -> StatusCode {
         Command::Start if test.phase == Phase::Running => StatusCode::OK,
         Command::Start if !can_start => StatusCode::CONFLICT,
         Command::Start => {
+            test.started = time;
+            test.initial = initial;
+            test.cpu_warning = above_target(hpa, time);
+            test.first_desired = None;
+            test.first_scale_ms = None;
+            test.ready_ms = None;
             test.phase = Phase::Running;
             test.deadline = time + 180_000;
             StatusCode::ACCEPTED
@@ -119,101 +171,101 @@ fn change(view: &mut View, cmd: Command, time: u64) -> StatusCode {
         }
     }
 }
-pub async fn control(
-    State(s): State<Store>,
-    ConnectInfo(peer): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
-    Json(cmd): Json<Command>,
-) -> StatusCode {
-    // Kubernetes port-forward connects to Pod loopback. Other Pods may only read the lease.
-    let host = headers
-        .get("host")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or("");
-    let origin = headers.get("origin").and_then(|h| h.to_str().ok());
-    if !peer.ip().is_loopback()
-        || !matches!(
-            host,
-            "localhost:9090"
-                | "127.0.0.1:9090"
-                | "[::1]:9090"
-                | "localhost:19090"
-                | "127.0.0.1:19090"
-                | "[::1]:19090"
-        )
-        || origin != Some(format!("http://{host}").as_str())
+pub async fn session_guard(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    let headers = req.headers();
+    if headers.get("x-grace-control").and_then(|h| h.to_str().ok()) != Some("session")
+        || headers.contains_key("origin")
     {
-        return StatusCode::FORBIDDEN;
+        return StatusCode::FORBIDDEN.into_response();
     }
-    if let Ok(verifier) = std::env::var("GRACE_PRESENTER_SHA256") {
-        if !super::logs::valid_key(&headers, &verifier) {
-            return StatusCode::UNAUTHORIZED;
+    let Some(cookie) = headers.get("cookie") else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+    let Ok(client) = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(3))
+        .build()
+    else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    match client
+        .get("http://app/api/devops/access")
+        .header("cookie", cookie)
+        .send()
+        .await
+    {
+        Ok(r) if r.status() == StatusCode::NO_CONTENT => {}
+        Ok(r) if r.status() == StatusCode::UNAUTHORIZED => {
+            return StatusCode::UNAUTHORIZED.into_response();
         }
+        Ok(_) => return StatusCode::FORBIDDEN.into_response(),
+        Err(_) => return StatusCode::SERVICE_UNAVAILABLE.into_response(),
     }
+    next.run(req).await
+}
+pub async fn operator_control(State(s): State<Store>, Json(cmd): Json<Command>) -> StatusCode {
     let mut status = StatusCode::OK;
     s.send_modify(|v| status = change(v, cmd, now()));
     status
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
-    #[tokio::test]
-    async fn load_control_accepts_only_same_origin_loopback_forwards() {
-        let store = std::sync::Arc::new(
-            tokio::sync::watch::channel(View {
-                load_test: Some(Test::default()),
-                ..View::default()
-            })
-            .0,
-        );
-        for (peer, host, origin, expected) in [
-            (
-                "127.0.0.1:4321",
-                "127.0.0.1:19090",
-                "http://127.0.0.1:19090",
-                StatusCode::OK,
-            ),
-            (
-                "[::1]:4321",
-                "localhost:9090",
-                "http://localhost:9090",
-                StatusCode::OK,
-            ),
-            (
-                "127.0.0.1:4321",
-                "localhost:19090",
-                "http://localhost:9090",
-                StatusCode::FORBIDDEN,
-            ),
-            (
-                "127.0.0.1:4321",
-                "example.org:19090",
-                "http://example.org:19090",
-                StatusCode::FORBIDDEN,
-            ),
-            (
-                "10.0.0.1:4321",
-                "127.0.0.1:19090",
-                "http://127.0.0.1:19090",
-                StatusCode::FORBIDDEN,
-            ),
-        ] {
-            let mut headers = HeaderMap::new();
-            headers.insert("host", host.parse().unwrap());
-            headers.insert("origin", origin.parse().unwrap());
-            assert_eq!(
-                control(
-                    State(store.clone()),
-                    ConnectInfo(peer.parse().unwrap()),
-                    headers,
-                    Json(Command::Stop)
-                )
-                .await,
-                expected
-            );
+    #[test]
+    fn warning_is_observed_once_and_survives_the_scaling_decision() {
+        let mut v = View {
+            load_test: Some(Test::default()),
+            ..View::default()
+        };
+        for kind in ["hpa", "deployments"] {
+            v.synced.insert(kind.into(), true);
         }
+        let status = |cpu, desired| json!({"cpu":cpu, "target":70, "desired":desired, "max":5});
+        v.resources
+            .entry("hpa".into())
+            .or_default()
+            .insert("app".into(), status(70, 2));
+        v.resources
+            .entry("deployments".into())
+            .or_default()
+            .insert("app".into(), json!({"available":2}));
+        assert_eq!(change(&mut v, Command::Start, 100), StatusCode::ACCEPTED);
+        assert!(!finish(&mut v, 101));
+        v.resources
+            .get_mut("hpa")
+            .unwrap()
+            .insert("app".into(), status(72, 2));
+        assert!(finish(&mut v, 110));
+        assert!(v.load_test.as_ref().unwrap().first_desired.is_none());
+        v.resources
+            .get_mut("hpa")
+            .unwrap()
+            .insert("app".into(), status(210, 5));
+        assert!(finish(&mut v, 120));
+        let test = v.load_test.as_ref().unwrap();
+        assert_eq!(
+            test.cpu_warning.as_ref().map(|w| (w.time, w.cpu, w.target)),
+            Some((110, 72, 70))
+        );
+        assert_eq!(
+            (test.first_desired, test.first_scale_ms),
+            (Some(5), Some(20))
+        );
+        assert!(!finish(&mut v, 121));
+        change(&mut v, Command::Stop, 122);
+        v.resources
+            .get_mut("hpa")
+            .unwrap()
+            .insert("app".into(), status(1, 2));
+        change(&mut v, Command::Start, 130);
+        assert!(v.load_test.as_ref().unwrap().cpu_warning.is_none());
+        assert!(v.load_test.as_ref().unwrap().first_desired.is_none());
     }
 
     #[test]

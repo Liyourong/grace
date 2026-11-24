@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, ArrowRight, ArrowUp, Check, X } from "lucide-react"
 
-import { api, KIND_LABEL, type Answer, type ApiError, type ExplainResponse, type Paper, type Question, type Stats } from "@/api"
+import { api, activity, operationId, KIND_LABEL, type Answer, type ApiError, type ExplainResponse, type Paper, type Question, type Stats } from "@/api"
 import { useStudyTime } from "@/useStudyTime"
 import { Notice } from "@/components/notice"
 import { Badge } from "@/components/ui/badge"
@@ -25,11 +25,12 @@ type ExplainState = {
 
 export function Practice(props: {
   paperId: string
+  group: React.RefObject<string | undefined>
   onExpired: (what: string) => void
-  onChanged: () => void
+  onChanged: (group?: string) => void
   onHome: () => void
 }) {
-  const { paperId, onExpired, onChanged, onHome } = props
+  const { paperId, group, onExpired, onChanged, onHome } = props
   const base = `/api/papers/${encodeURIComponent(paperId)}`
   const [paper, setPaper] = useState<Paper | null>(null)
   const [clockOffset, setClockOffset] = useState<number | null>(null)
@@ -54,11 +55,11 @@ export function Practice(props: {
   const targetIndex = useRef(0)
   const [navigating, setNavigating] = useState(false)
 
-  function send<T>(method: "PUT" | "POST", path: string, body?: object) {
+  function send<T>(method: "PUT" | "POST", path: string, body?: object, action?:string) {
     const view = progress.current
     const next = queue.current.then(async () => {
       if (!view || view !== progress.current) return
-      const r = await api<T & { revision?: number }>(method, path, method === "PUT" ? { ...body, expected_revision: view.revision } : body)
+      const r = await api<T & { revision?: number }>(method, path, method === "PUT" ? { ...body, expected_revision: view.revision } : body,action)
       if (view !== progress.current) return
       if (r.ok && method === "POST") return r
       const revision = r.ok ? r.data?.revision : undefined
@@ -85,7 +86,7 @@ export function Practice(props: {
 
   useEffect(() => {
     let cancelled = false
-    api<Paper>("GET", base).then((r) => {
+    api<Paper>("GET", base,undefined,group.current).then((r) => {
       if (cancelled) return
       if (r.ok) {
         if (!Number.isSafeInteger(r.data.revision)) {
@@ -110,7 +111,7 @@ export function Practice(props: {
       // Also discard a pending explanation when switching papers/unmounting.
       explainRequestId.current += 1
     }
-  }, [base, attempt, onExpired])
+  }, [base, attempt, onExpired,group])
 
   useStudyTime(clockOffset, !!paper?.questions.length && !finished, onChanged)
 
@@ -163,7 +164,8 @@ export function Practice(props: {
   async function submit(q: Question, payload: { option_id: string } | { text: string }) {
     clearExplain()
     setBusy(true)
-    const r = await send<{ answer: Answer; stats: Stats }>("PUT", `${base}/answers/${encodeURIComponent(q.id)}`, payload)
+    const action=operationId()
+    const r = await send<{ answer: Answer; stats: Stats }>("PUT", `${base}/answers/${encodeURIComponent(q.id)}`, payload,action)
     if (!r) return
     setBusy(false)
     const num = questions.indexOf(q) + 1
@@ -177,7 +179,7 @@ export function Practice(props: {
       })
       setPaper((p) => p && { ...p, stats, questions: p.questions.map((x) => (x.id === q.id ? { ...x, answer } : x)) })
       setWarn(null)
-      onChanged()
+      onChanged(action)
     } else if (r.status === 401) {
       onExpired(`your answer to question ${num} was not saved`)
     } else {
@@ -255,7 +257,7 @@ export function Practice(props: {
             </div>
             <p className="text-sm text-muted-foreground">Your answers are saved. You can come back and change them anytime.</p>
             <div className="flex justify-between">
-              <Button variant="ghost" onClick={() => setFinished(false)}>
+              <Button variant="ghost" onClick={() => {setFinished(false);void activity("review_answers")}}>
                 Back to edit
               </Button>
               <Button onClick={onHome}>Done</Button>

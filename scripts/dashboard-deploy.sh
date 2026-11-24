@@ -7,6 +7,19 @@ k=(kubectl --context "$context" -n grace)
 demo=false
 if [[ "$context" == grace-dash-demo || ${2:-} == --enable-hpa-demo ]]; then demo=true; fi
 
+# A fresh Minikube addon samples CPU once per minute. Shorten that interval on the rehearsal profile.
+if [[ "$context" == grace-dash-demo ]]; then
+  metrics=(kubectl --context "$context" -n kube-system)
+  patch=$("${metrics[@]}" get deployment/metrics-server -o json | jq -c '
+    [.spec.template.spec.containers | to_entries[] | select(.value.name=="metrics-server") |
+     .key as $container | .value.args | to_entries[] | select(.value=="--metric-resolution=60s") |
+     {op:"replace",path:("/spec/template/spec/containers/"+($container|tostring)+"/args/"+(.key|tostring)),value:"--metric-resolution=15s"}]')
+  if [[ "$patch" != "[]" ]]; then
+    "${metrics[@]}" patch deployment/metrics-server --type=json -p "$patch"
+    "${metrics[@]}" rollout status deployment/metrics-server --timeout=3m
+  fi
+fi
+
 # Read the effective Pod spec: registry credentials may have been injected at admission.
 "${k[@]}" rollout status deployment/app --timeout=4m
 app=$("${k[@]}" get deployment/app -o json)
@@ -29,21 +42,22 @@ resources: [monitoring]
 patches:
   - path: dashboard-patch.json
 YAML
-jq -n --arg image "$image" --argjson secrets "$pull_secrets" --argjson demo "$demo" --arg context "$context" '
+config=$(jq -er '.spec.template.spec.containers[] | select(.name=="grace") | .envFrom[] | .configMapRef.name' <<< "$app" | head -1)
+origin=$("${k[@]}" get configmap "$config" -o jsonpath='{.data.APP_ORIGINS}')
+origin=${GRACE_APP_ORIGIN:-${origin%%,*}}
+jq -n --arg image "$image" --argjson secrets "$pull_secrets" --argjson demo "$demo" --arg origin "$origin" '
   {apiVersion:"apps/v1",kind:"Deployment",metadata:{name:"grace-dashboard",namespace:"grace"},
    spec:{template:{spec:{imagePullSecrets:$secrets,containers:[{name:"dashboard",image:$image,
-     env:([{name:"GRACE_HPA_DEMO",value:(if $demo then "1" else "0" end)}] +
-       (if $context != "grace-dash-demo" then
-          [{name:"GRACE_PRESENTER_SHA256",valueFrom:{configMapKeyRef:{name:"grace-dashboard-presenter",key:"sha256",optional:($demo|not)}}}]
-        else [] end))}]}}}}' > "$dir/dashboard-patch.json"
+     env:[{name:"GRACE_HPA_DEMO",value:(if $demo then "1" else "0" end)},
+          {name:"GRACE_APP_ORIGIN",value:$origin}]}]}}}}' > "$dir/dashboard-patch.json"
 "${k[@]}" apply -k "$dir"
 "${k[@]}" rollout status deployment/grace-dashboard --timeout=180s
 
 # Verify the Service path and allow newly installed Prometheus time to scrape two samples.
-proxy='/api/v1/namespaces/grace/services/http:grace-dashboard:http/proxy'
+service='/api/v1/namespaces/grace/services/http:grace-dashboard'
 for attempt in {1..12}; do
-  if "${k[@]}" get --request-timeout=10s --raw "$proxy/health/ready" >/dev/null &&
-     "${k[@]}" get --request-timeout=12s --raw "$proxy/api/metrics" | jq -e '
+  if "${k[@]}" get --request-timeout=10s --raw "$service:http/proxy/health/ready" >/dev/null &&
+     "${k[@]}" get --request-timeout=12s --raw "$service:viewer/proxy/api/metrics" | jq -e '
     .end as $end | .series as $s | ["podIn","podOut"] | all(.[]; . as $key |
       any($s[$key][]?; .values[-1] | .[0] == $end and (.[1] | tonumber? | isfinite)))' >/dev/null; then
     break
