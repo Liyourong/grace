@@ -123,6 +123,6 @@ Return to the cloud practice tab, question 1. Click **Explain** under the graded
 
 - **Cloud app or DevOps unavailable.** Switch once to the prepared Minikube window. Say, “We’ll continue on our backup Kubernetes cluster.” Click **où** there before querying. Use **Minikube** in Readiness and check `--context grace-dash-demo` on the command you paste.
 - **Cloud database restart already started.** Leave its rollout terminal open. Use a separate terminal for Minikube. Show a complete before-and-after pair from the same cluster.
-- **Only the HPA or Explain result is late.** Continue with the next slide. A recorded [HPA rehearsal](dashboard/evidence/hpa-button.png) and the Explain slide provide fallbacks. Identify rehearsal evidence as recorded when you show it.
+- **Only the HPA or Explain result is late.** Continue with the next slide. A recorded [HPA rehearsal](../dashboard/evidence/hpa-button.png) and the Explain slide provide fallbacks. Identify rehearsal evidence as recorded when you show it.
 
 After the presentation, stop any active load test and leave the test account’s paper and answers in place. On a borrowed laptop, sign out of Grace and delete the supplied `~/Downloads/token.txt` and the dedicated `~/.kube/grace-class-demo.yaml`.
