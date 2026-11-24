@@ -710,3 +710,25 @@ html[data-viewer] :is(.toolbar nav, #loadTest, .resourcehead a, .key span:last-c
 .trace-detail h2 { margin-bottom: 8px; }
 .trace-detail ol { padding-left: 20px; line-height: 1.8; }
 .trace-detail .failed { color: #e398a1; }
+
+#persistence label, #commandHelp, #persistenceSteps [role="status"] { color: var(--muted); font-size: 12px; }
+#persistence h2 { margin-bottom: 12px; }
+#persistenceSteps { padding-left: 22px; }
+#persistenceSteps li { margin: 14px 0; }
+#persistenceSteps [role="status"] { margin-left: 8px; }
+#persistenceSteps pre { margin: 6px 0; white-space: pre-wrap; overflow-wrap: anywhere;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: inherit; padding: 8px; font: 11px/1.5 var(--mono); }
+.log-pages { display: flex; gap: 8px; padding: 10px 16px; }
+.log-pages button, #persistenceSteps button, #commandEnv { border: 1px solid var(--line); border-radius: 4px;
+  color: inherit; background: var(--panel); padding: 5px 9px; }
+.log-pages button:disabled { opacity: .45; }
+
+html[data-environment="Compose"] .cpu-panel { display: none; }
+.cpu-reading { display: flex; align-items: baseline; justify-content: space-between; }
+#appCpu { font: 600 22px/1.3 var(--mono); color: #a9c5eb; }
+#cpuTarget, #cpuCaption { font-size: 11px; color: var(--muted); }
+#cpuTarget::before { content: ""; display: inline-block; width: 12px; margin: 0 5px 3px 0; border-top: 2px dashed #e0b481; }
+#appCpuPlot { display: block; width: 100%; height: 53px; margin: 4px 0; }
+#cpuNotice { margin-top: 9px; padding: 7px 9px; border-left: 3px solid #e0b481; background: #342d24; }
+#cpuNotice strong { color: #f2ca93; font-size: 12px; }
+#cpuNotice p { white-space: pre-line; font: 11px/1.6 var(--mono); }

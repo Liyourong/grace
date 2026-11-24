@@ -9,7 +9,9 @@ mod auth;
 mod common;
 mod cloud;
 mod demo_cpu;
+mod devops;
 mod observation;
+mod operations;
 mod papers;
 mod practice;
 
@@ -39,6 +41,7 @@ const MIGRATIONS: &[(&str, &str)] = &[
     ("0004_progress_revision", include_str!("../migrations/0004_progress_revision.sql")),
     ("0005_paper_library", include_str!("../migrations/0005_paper_library.sql")),
     ("0006_study_time", include_str!("../migrations/0006_study_time.sql")),
+    ("0007_devops", include_str!("../migrations/0007_devops.sql")),
 ];
 
 #[tokio::main]
@@ -60,18 +63,21 @@ async fn main() {
 
     let api = Router::new()
         .merge(auth::router())
+        .merge(devops::router())
         .merge(papers::router())
         .merge(practice::router())
         .layer(from_fn_with_state(state.clone(), require_origin))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
-        .layer(axum::middleware::from_fn(observation::record));
+        .layer(from_fn_with_state(state.clone(), observation::record));
 
+    tokio::spawn(devops::prune(state.pool.clone()));
     observation::start_metrics().await;
     if std::env::var("GRACE_HPA_DEMO").as_deref() == Ok("1") {
         tokio::spawn(demo_cpu::run());
     }
     let app = Router::new()
         .merge(api)
+        .merge(devops::pages())
         .route("/health/live", get(|| async { StatusCode::OK }))
         .route("/health/ready", get(ready))
         .fallback_service(ServeDir::new(env("STATIC_DIR", "../frontend")))

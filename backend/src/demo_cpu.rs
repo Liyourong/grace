@@ -8,6 +8,7 @@ pub async fn run() {
         .timeout(Duration::from_secs(2))
         .build()
         .expect("demo client");
+    let fast = std::env::var("GRACE_HPA_FAST").as_deref() != Ok("0");
     loop {
         let active = client
             .get("http://grace-dashboard:9090/api/load-test")
@@ -15,8 +16,8 @@ pub async fn run() {
             .await
             .is_ok_and(|r| r.status() == reqwest::StatusCode::NO_CONTENT);
         if active {
-            let _ = tokio::task::spawn_blocking(|| {
-                let end = Instant::now() + Duration::from_millis(300);
+            let _ = tokio::task::spawn_blocking(move || {
+                let end = Instant::now() + Duration::from_millis(if fast { 800 } else { 300 });
                 while Instant::now() < end {
                     std::hint::spin_loop();
                 }
@@ -24,9 +25,9 @@ pub async fn run() {
             .await;
         }
         let pause = if active {
-            Duration::from_millis(700)
+            Duration::from_millis(if fast { 200 } else { 700 })
         } else {
-            Duration::from_secs(3)
+            Duration::from_millis(if fast { 750 } else { 3000 })
         };
         tokio::time::sleep(pause).await;
     }

@@ -216,8 +216,8 @@ In Terminal A, check the actual data coming through the dashboard:
 ```sh
 curl -fsS -o /dev/null -w 'Grace ready: %{http_code}\n' http://localhost:8090/health/ready
 curl -fsS -o /dev/null -w 'Dashboard ready: %{http_code}\n' http://127.0.0.1:9090/health/ready
-curl -fsS http://127.0.0.1:9090/api/snapshot | jq '{nodes:(.resources.nodes|keys), synced, replicas:.resources.deployments.app}'
-curl -fsS http://127.0.0.1:9090/api/metrics | jq '.end as $end | [.series.podIn,.series.podOut] | map(any(.[]?; .values[-1][0] == $end))'
+kubectl --context grace-dash-demo get --raw /api/v1/namespaces/grace/services/http:grace-dashboard:viewer/proxy/api/snapshot | jq '{nodes:(.resources.nodes|keys), synced, replicas:.resources.deployments.app}'
+kubectl --context grace-dash-demo get --raw /api/v1/namespaces/grace/services/http:grace-dashboard:viewer/proxy/api/metrics | jq '.end as $end | [.series.podIn,.series.podOut] | map(any(.[]?; .values[-1][0] == $end))'
 ```
 
 Both health checks should print `200`. The snapshot should list both nodes, all sync flags should be `true`, and the traffic check should print `[true, true]`. In **Topology**, locate the app Pods and the database volume. The **Live traffic** panel shows incoming and outgoing bandwidth. In **Metrics**, look for the submission you just made after the next scrape.
@@ -272,40 +272,11 @@ python3 scripts/dashboard-demo.py burst --url http://localhost:8090
 
 Expect ten HTTP 200 results. Open the **Login burst** panel and look for ten requests with Pod attribution. To see a failed request, repeat the last command with `--wrong-password`. Expect nine successes and one HTTP 401. The CPU load test and login burst exercise different parts of the dashboard.
 
-### Optional: inspect private Logs and Trace on your own cluster
+### Inspect a saved answer in Logs
 
-Check whether your checkout includes `dashboard/logs.js`. The published `dev` revision used for this walkthrough includes the topology, metrics, readiness and login views. Private Logs requires a revision that also contains that file. If you already have a running profile and have just switched to such a checkout, update the local image before continuing:
+Sign in as the provisioned `grace_test` account. Submit an answer in Grace and follow the original [local dashboard link](http://localhost:9090/#logs-view). Select **Submit answer** to inspect the session check, question lookup, grading and database transaction. Logs retain seven days of requests across app restarts. The same dashboard opens from **DevOps** on the Grace home page.
 
-```sh
-docker build -t grace:local-traces .
-minikube -p grace-dash-demo image load grace:local-traces
-kubectl --context grace-dash-demo -n grace set image deployment/app grace=grace:local-traces
-bash scripts/dashboard-deploy.sh grace-dash-demo
-```
-
-Use this block **once on your new local profile**. It generates a private presenter link in a temporary file and configures its verifier on the local dashboard. Keep that file until you finish the rehearsal.
-
-```sh
-(
-  set -eu
-  umask 077
-  key=$(openssl rand -hex 32)
-  presenter_file=$(mktemp)
-  printf 'http://127.0.0.1:19090/#presenter=%s\n' "$key" > "$presenter_file"
-  verifier=$(printf %s "$key" | openssl dgst -sha256 -r | cut -d' ' -f1)
-  kubectl --context grace-dash-demo -n grace set env deployment/grace-dashboard GRACE_PRESENTER_SHA256="$verifier"
-  kubectl --context grace-dash-demo -n grace rollout status deployment/grace-dashboard --timeout=3m
-  printf 'Open the private URL stored in %s in your local rehearsal browser profile.\n' "$presenter_file"
-)
-```
-
-The rollout replaces the dashboard Pod. Stop Terminal C's old forward, then run the command below there. Reserve port 19090 for this local forward. If you also present the cloud deployment, use a separate browser profile for the local key.
-
-```sh
-kubectl --context grace-dash-demo -n grace port-forward --address 127.0.0.1 deployment/grace-dashboard 19090:9090 9091:9091
-```
-
-Open the URL saved in the temporary file. Sign in and submit an answer at [the local cluster app](http://localhost:8090/), then open [local presenter Logs](http://127.0.0.1:19090/#logs-view). Select the latest `PUT …/answers/…` row to see the session check, question lookup, grading and database transaction. The private control tab on 19090 now also handles the load-test button. The public cloud viewer has a different data source.
+Open **Readiness → Database persistence** to copy each command for your environment. Read the saved answer, restart PostgreSQL, then repeat the query. Reload the question in Grace to show the saved answer. Open **Topology → Start load test** to watch the replica count and both scaling times.
 
 ### Stop, resume or diagnose the local cluster
 
@@ -320,13 +291,13 @@ Stop both port-forwards with Ctrl+C and run `minikube stop -p grace-dash-demo`. 
 
 ## 8. Open the team's cloud dashboard
 
-Anyone can open the [public dashboard](https://status.146-190-191-107.sslip.io/) to watch topology and Pod traffic. To inspect private request logs, get an authorized kubeconfig and the presenter link from the project maintainer. Confirm that `kubectl config get-contexts` lists `do-tor1-grace`, then run:
+Anyone can open the [public dashboard](https://status.146-190-191-107.sslip.io/) to watch topology and Pod traffic. After deploying this version, sign in to the cloud app as `grace_test` and select **DevOps**. To use the presentation port-forward, confirm that `kubectl config get-contexts` lists `do-tor1-grace`, then run:
 
 ```sh
 kubectl --context do-tor1-grace -n grace port-forward --address 127.0.0.1 svc/grace-dashboard 19090:9090
 ```
 
-Keep that terminal open. Open the private presenter link once in the browser you will use. Submit an answer in the [cloud app](https://146-190-191-107.sslip.io/), open [private Logs](http://127.0.0.1:19090/#logs-view), and select the `PUT …/answers/…` row to see its trace. This dashboard shows requests sent to the cloud app. For an autoscaling demonstration, **Topology → Start load test** generates CPU load. A login or answer submission generates a business request trace.
+Keep that terminal open. Submit an answer in the [cloud app](https://146-190-191-107.sslip.io/), open [private Logs](http://127.0.0.1:19090/#logs-view), and select **Submit answer** to inspect its trace. If prompted to sign in, the dashboard returns to Logs after authentication.
 
 ## If a step fails
 
@@ -335,4 +306,4 @@ Keep that terminal open. Open the private presenter link once in the browser you
 | Docker says port 8090 is already allocated | Check `docker ps` and any terminal running a Kubernetes port-forward. Stop the process you own that uses 8090, then retry the startup command. |
 | Readiness keeps failing | Run `docker compose ps` and `docker compose logs --tail=60 app db`. Check the database health and the app's first startup error. |
 | Registration reports that email is unavailable | Use the exact demo address from `.env`. Confirm that the filename is `.env`, including the leading dot, and run `docker compose up -d` after edits. For a second account with real email, configure SendGrid. |
-| Private Logs asks you to unlock | Open the presenter link in that browser profile. Chrome and the Codex in-app browser store their unlock state separately. |
+| DevOps asks you to sign in | Use the provisioned `grace_test` account on the Grace origin for the selected environment. |

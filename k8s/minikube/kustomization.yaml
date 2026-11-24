@@ -5,3 +5,13 @@ images:
   - name: grace
     newName: grace
     newTag: local
+# Let the rehearsal return to its two-Pod starting point between demonstrations.
+patches:
+  - patch: |-
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata: { name: app }
+      spec:
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 60

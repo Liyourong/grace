@@ -224,7 +224,7 @@ async fn verify(State(s): State<AppState>, Body(c): Body<Verification>) -> Resul
         store::Verify::Created(username) => Ok((
             StatusCode::CREATED,
             [(SET_COOKIE, rules::session_cookie(&token, s.cookie_secure))],
-            user_json(&username),
+            user_json(&username, false),
         )
             .into_response()),
         store::Verify::NoPending => Err(no_pending()),
@@ -264,7 +264,7 @@ async fn login(State(s): State<AppState>, Body(c): Body<Credentials>) -> Result<
 
     let (token, token_hash) = rules::new_token();
     step("Session creation", store::login_session(&mut db, user_id, &token_hash)).await?;
-    Ok(([(SET_COOKIE, rules::session_cookie(&token, s.cookie_secure))], user_json(&username)).into_response())
+    Ok(([(SET_COOKIE, rules::session_cookie(&token, s.cookie_secure))], user_json(&username, crate::devops::allowed(&db, user_id).await?)).into_response())
 }
 
 async fn logout(State(s): State<AppState>, headers: HeaderMap) -> Result<Response> {
@@ -274,14 +274,15 @@ async fn logout(State(s): State<AppState>, headers: HeaderMap) -> Result<Respons
     Ok((StatusCode::NO_CONTENT, [(SET_COOKIE, rules::clear_cookie(s.cookie_secure))]).into_response())
 }
 
-async fn me(user: CurrentUser) -> Json<Value> {
-    user_json(&user.username)
+async fn me(State(s): State<AppState>, user: CurrentUser) -> Result<Json<Value>> {
+    let db = s.pool.get().await?;
+    Ok(user_json(&user.username, crate::devops::allowed(&db, user.id).await?))
 }
 
 fn verification_json(email: &str) -> Json<Value> {
     Json(json!({ "verification": { "email": email, "resend_after_seconds": rules::RESEND_COOLDOWN_SECONDS } }))
 }
 
-fn user_json(username: &str) -> Json<Value> {
-    Json(json!({ "user": { "username": username } }))
+fn user_json(username: &str, devops: bool) -> Json<Value> {
+    Json(json!({ "user": { "username": username, "devops": devops } }))
 }

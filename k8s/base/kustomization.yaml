@@ -10,4 +10,5 @@ configMapGenerator:
   - name: grace-config
     literals:
       - APP_ORIGINS=http://localhost:8090
+      - GRACE_ENVIRONMENT=Minikube
       - COOKIE_SECURE=false

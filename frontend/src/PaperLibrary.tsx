@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { DropdownMenu } from "radix-ui"
 
-import { api, type FolderSummary, type Library, type PaperSummary } from "@/api"
+import { activity, api, operationId, type FolderSummary, type Library, type PaperSummary } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -64,9 +64,9 @@ function LibraryDialog({
   action: Action
   folders: FolderSummary[]
   close: () => void
-  saved: () => void
+  saved: (group: string) => void
   expired: () => void
-  reload: () => void
+  reload: (group?: string) => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [name, setName] = useState(
@@ -88,31 +88,32 @@ function LibraryDialog({
   async function submit() {
     if (pending) return
     setPending(true)
+    const group = operationId()
     let result
     switch (action.kind) {
       case "create":
-        result = await api("POST", "/api/folders", { name })
+        result = await api("POST", "/api/folders", { name }, group)
         break
       case "rename":
         result = await api("PATCH", "/api/folders/" + action.folder.id, {
           name,
-        })
+        }, group)
         break
       case "move":
         result = await api("PATCH", "/api/papers/" + action.paper.id, {
           folder_id: destination || null,
-        })
+        }, group)
         break
       case "deleteFolder":
-        result = await api("DELETE", "/api/folders/" + action.folder.id)
+        result = await api("DELETE", "/api/folders/" + action.folder.id, undefined, group)
         break
       case "deletePaper":
-        result = await api("DELETE", "/api/papers/" + action.paper.id)
+        result = await api("DELETE", "/api/papers/" + action.paper.id, undefined, group)
         break
     }
-    if (result.ok) return saved()
+    if (result.ok) return saved(group)
     if (result.status === 401) return expired()
-    if (result.uncertain || result.status === 404) reload()
+    if (result.uncertain || result.status === 404) reload(group)
     setError(
       result.uncertain
         ? "Check the library before trying again. The change may have been saved."
@@ -225,11 +226,15 @@ export function PaperLibrary({
   failed: boolean
   activeId: string | null
   select: (id: string | null) => void
-  reload: () => void
+  reload: (group?: string) => void
   expired: () => void
 }) {
   const [action, setAction] = useState<Action | null>(null)
   const [closed, setClosed] = useState<string[]>([])
+  function edit(next: Action | null) {
+    void activity(next ? "open_library_dialog" : "close_library_dialog")
+    setAction(next)
+  }
   function paperRow(p: PaperSummary) {
     return (
       <div key={p.id} className="flex items-center">
@@ -245,13 +250,13 @@ export function PaperLibrary({
         <Actions name={p.title}>
           <DropdownMenu.Item
             className={itemStyle}
-            onSelect={() => setAction({ kind: "move", paper: p })}
+            onSelect={() => edit({ kind: "move", paper: p })}
           >
             Move to…
           </DropdownMenu.Item>
           <DropdownMenu.Item
             className={itemStyle}
-            onSelect={() => setAction({ kind: "deletePaper", paper: p })}
+            onSelect={() => edit({ kind: "deletePaper", paper: p })}
           >
             Delete paper
           </DropdownMenu.Item>
@@ -267,7 +272,7 @@ export function PaperLibrary({
           size="sm"
           variant="ghost"
           disabled={!library}
-          onClick={() => setAction({ kind: "create" })}
+          onClick={() => edit({ kind: "create" })}
         >
           <FolderPlus />
           New folder
@@ -280,7 +285,7 @@ export function PaperLibrary({
         {failed && (
           <p role="alert" className="px-2 text-sm">
             Couldn’t refresh papers.{" "}
-            <button onClick={reload} className="underline">
+            <button onClick={() => reload()} className="underline">
               Retry
             </button>
           </p>
@@ -296,13 +301,14 @@ export function PaperLibrary({
                   variant="ghost"
                   aria-expanded={expanded}
                   className="min-w-0 flex-1 justify-start px-1"
-                  onClick={() =>
+                  onClick={() => {
+                    void activity("toggle_folder")
                     setClosed(
                       expanded
                         ? [...closed, f.id]
                         : closed.filter((id) => id !== f.id)
                     )
-                  }
+                  }}
                 >
                   {expanded ? <ChevronDown /> : <ChevronRight />}
                   {expanded ? <FolderOpen /> : <Folder />}
@@ -311,14 +317,14 @@ export function PaperLibrary({
                 <Actions name={f.name}>
                   <DropdownMenu.Item
                     className={itemStyle}
-                    onSelect={() => setAction({ kind: "rename", folder: f })}
+                    onSelect={() => edit({ kind: "rename", folder: f })}
                   >
                     Rename folder
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className={itemStyle}
                     onSelect={() =>
-                      setAction({ kind: "deleteFolder", folder: f })
+                      edit({ kind: "deleteFolder", folder: f })
                     }
                   >
                     Delete folder
@@ -350,12 +356,12 @@ export function PaperLibrary({
           folders={library.folders}
           expired={expired}
           reload={reload}
-          close={() => setAction(null)}
-          saved={() => {
+          close={() => edit(null)}
+          saved={(group) => {
             if (action.kind === "deletePaper" && activeId === action.paper.id)
               select(null)
             setAction(null)
-            reload()
+            reload(group)
           }}
         />
       )}

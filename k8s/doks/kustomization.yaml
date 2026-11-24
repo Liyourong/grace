@@ -15,6 +15,7 @@ configMapGenerator:
     literals:
       - SITE_HOST=146-190-191-107.sslip.io
       - APP_ORIGINS=https://146-190-191-107.sslip.io
+      - GRACE_ENVIRONMENT=DOKS
       - COOKIE_SECURE=true
   - name: caddyfile
     files:
