@@ -21,9 +21,23 @@ pub async fn call<T: DeserializeOwned>(payload: &impl Serialize, timeout_secs: u
         .json(payload)
         .send()
         .await
-        .map_err(|_| FunctionError::Upstream)?;
+        .map_err(|err| {
+            if err.is_timeout() {
+                eprintln!("AI Function request timed out");
+            } else if err.is_connect() {
+                eprintln!("AI Function connection failed");
+            } else {
+                eprintln!("AI Function request failed");
+            }
+
+            FunctionError::Upstream
+    })?;
 
     if !response.status().is_success() {
+        eprintln!(
+        "AI Function returned HTTP {}",
+        response.status().as_u16()
+        );
         return Err(FunctionError::Upstream);
     }
     response.json().await.map_err(|_| FunctionError::Upstream)

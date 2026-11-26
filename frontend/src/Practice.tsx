@@ -444,7 +444,9 @@ function Feedback({
           </div>
         )}
         {explain?.status === "error" && (
-          <p className="text-destructive" role="alert">Explanation unavailable: {explain.message}. Please try again.</p>
+          <p className="text-destructive" role="alert">
+          {explain.message || "Explanation is temporarily unavailable."}
+          </p>
         )}
       </div>
     </div>

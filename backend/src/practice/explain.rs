@@ -68,7 +68,7 @@ fn upstream_error() -> AppError {
 
 /// Called only by the authenticated /explain route, never automatically on submissions.
 pub async fn request(payload: Payload) -> Result<String> {
-    let result: FunctionResponse = crate::cloud::call(&payload, 12).await.map_err(|e| match e {
+    let result: FunctionResponse = crate::cloud::call(&payload, 30).await.map_err(|e| match e {
         crate::cloud::FunctionError::Unavailable => unavailable(),
         crate::cloud::FunctionError::Upstream => upstream_error(),
     })?;
