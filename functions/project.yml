@@ -1,0 +1,13 @@
+packages:
+  - name: grace
+    functions:
+      - name: explain-answer
+        runtime: nodejs:22
+        web: true
+        webSecure: "${GRACE_EXPLAIN_TOKEN}"
+        environment:
+          OPENAI_API_KEY: "${OPENAI_API_KEY}"
+        limits:
+          timeout: 50000
+          memory: 256
+          logs: 16

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: grace-dashboard }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: grace-dashboard } }
+  template:
+    metadata: { labels: { app: grace-dashboard } }
+    spec:
+      serviceAccountName: grace-dashboard
+      securityContext: { runAsNonRoot: true, runAsUser: 65534 }
+      containers:
+        - name: dashboard
+          image: grace:local
+          command: [dashboard]
+          ports: [{ name: http, containerPort: 9090 }, { name: viewer, containerPort: 9092 }]
+          readinessProbe: { httpGet: { path: /health/ready, port: http } }
+          resources:
+            requests: { cpu: 20m, memory: 24Mi }
+            limits: { memory: 96Mi }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: grace-dashboard }
+spec:
+  selector: { app: grace-dashboard }
+  ports: [{ name: http, port: 9090, targetPort: http }, { name: viewer, port: 9092, targetPort: viewer }]

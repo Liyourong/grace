@@ -1,0 +1,7 @@
+.DS_Store
+backend/target/
+# Secrets: compose reads .env automatically; the SendGrid key file must never be committed.
+.env
+.env.*
+sendgrid-api-key*
+__pycache__/

@@ -1,0 +1,267 @@
+{
+  "format_version": 1,
+  "title": "Basic Sentences",
+  "description": "Build everyday sentences with subjects, verbs, articles and adjectives.",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "prompt": "Complete the introduction: « Je ___ étudiante. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "es"
+        },
+        {
+          "id": "b",
+          "text": "suis"
+        },
+        {
+          "id": "c",
+          "text": "sommes"
+        },
+        {
+          "id": "d",
+          "text": "est"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "suis",
+      "explanation": "Je takes suis, the first-person singular form of être."
+    },
+    {
+      "id": "q2",
+      "type": "choice",
+      "prompt": "Say that the children play in the garden: « Les enfants ___ dans le jardin. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "jouons"
+        },
+        {
+          "id": "b",
+          "text": "joue"
+        },
+        {
+          "id": "c",
+          "text": "jouez"
+        },
+        {
+          "id": "d",
+          "text": "jouent"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "jouent",
+      "explanation": "Les enfants is plural, so jouer takes the third-person plural ending -ent."
+    },
+    {
+      "id": "q3",
+      "type": "choice",
+      "prompt": "Choose the indefinite article: « Lina achète ___ pomme. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "des"
+        },
+        {
+          "id": "b",
+          "text": "du"
+        },
+        {
+          "id": "c",
+          "text": "une"
+        },
+        {
+          "id": "d",
+          "text": "un"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "une",
+      "explanation": "Pomme is a singular feminine noun. Une means “a” with a feminine noun."
+    },
+    {
+      "id": "q4",
+      "type": "choice",
+      "prompt": "Choose the definite article: « ___ oiseaux chantent. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "La"
+        },
+        {
+          "id": "b",
+          "text": "Le"
+        },
+        {
+          "id": "c",
+          "text": "Les"
+        },
+        {
+          "id": "d",
+          "text": "L’"
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "Les",
+      "explanation": "The plural definite article is les, including before a vowel."
+    },
+    {
+      "id": "q5",
+      "type": "choice",
+      "prompt": "Complete the description: « Ces deux maisons sont ___. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "blancs"
+        },
+        {
+          "id": "b",
+          "text": "blanche"
+        },
+        {
+          "id": "c",
+          "text": "blanc"
+        },
+        {
+          "id": "d",
+          "text": "blanches"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "blanches",
+      "explanation": "Maisons is feminine plural, so blanc becomes blanches."
+    },
+    {
+      "id": "q6",
+      "type": "choice",
+      "prompt": "Where does the object pronoun go? Replace « le vélo » in « Paul répare le vélo. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Paul le répare."
+        },
+        {
+          "id": "b",
+          "text": "Paul répare il."
+        },
+        {
+          "id": "c",
+          "text": "Le Paul répare."
+        },
+        {
+          "id": "d",
+          "text": "Paul répare le."
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "Paul le répare.",
+      "explanation": "In this affirmative present-tense sentence, le comes directly before répare."
+    },
+    {
+      "id": "q7",
+      "type": "choice",
+      "prompt": "Choose the standard written negative of « Elle aime le thé. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "Elle aime ne pas le thé."
+        },
+        {
+          "id": "b",
+          "text": "Elle n’aime pas le thé."
+        },
+        {
+          "id": "c",
+          "text": "Elle ne pas aime le thé."
+        },
+        {
+          "id": "d",
+          "text": "Elle n’pas aime le thé."
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "Elle n’aime pas le thé.",
+      "explanation": "Ne becomes n’ before aime. Pas follows the conjugated verb."
+    },
+    {
+      "id": "q8",
+      "type": "choice",
+      "prompt": "Complete the sentence: « Vous ___ deux billets. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "avons"
+        },
+        {
+          "id": "b",
+          "text": "avez"
+        },
+        {
+          "id": "c",
+          "text": "ont"
+        },
+        {
+          "id": "d",
+          "text": "as"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "avez",
+      "explanation": "The present form of avoir with vous is avez."
+    },
+    {
+      "id": "q9",
+      "type": "choice",
+      "prompt": "Say “I live in Lyon”: « J’habite ___ Lyon. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "en la"
+        },
+        {
+          "id": "b",
+          "text": "à"
+        },
+        {
+          "id": "c",
+          "text": "aux"
+        },
+        {
+          "id": "d",
+          "text": "au"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "à",
+      "explanation": "Use à before the city name Lyon."
+    },
+    {
+      "id": "q10",
+      "type": "choice",
+      "prompt": "Choose the ordinary declarative sentence meaning “The cat follows the dog.”",
+      "options": [
+        {
+          "id": "a",
+          "text": "Le chien suit le chat."
+        },
+        {
+          "id": "b",
+          "text": "Le chat suivre le chien."
+        },
+        {
+          "id": "c",
+          "text": "Le chat et le chien suivent."
+        },
+        {
+          "id": "d",
+          "text": "Le chat suit le chien."
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "Le chat suit le chien.",
+      "explanation": "The subject le chat comes before the conjugated verb suit; le chien is its object."
+    }
+  ]
+}

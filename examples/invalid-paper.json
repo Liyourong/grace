@@ -1,0 +1,43 @@
+{
+  "format_version": 1,
+  "title": "Invalid format example",
+  "description": "A sample paper with all three question types.",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "prompt": "Choose the French word for “hello”.",
+      "options": [
+        {
+          "id": "a",
+          "text": "Bonjour"
+        },
+        {
+          "id": "b",
+          "text": "Merci"
+        }
+      ],
+      "correct_option_id": "z",
+      "correct_answer": "Bonjour",
+      "explanation": "Bonjour is used as a greeting."
+    },
+    {
+      "id": "q1",
+      "type": "translation",
+      "prompt": "Translate “thank you” into French.",
+      "accepted_answers": [
+        "Merci",
+        "Merci !"
+      ],
+      "correct_answer": "Merci.",
+      "explanation": "This question accepts the answers listed in the file, plus variations the matching rules allow."
+    },
+    {
+      "id": "q3",
+      "type": "sentence",
+      "prompt": "Use aimer to say “I like French”.",
+      "correct_answer": "J'aime le français.",
+      "explanation": "This question is matched against preset answers; meaning is not evaluated."
+    }
+  ]
+}

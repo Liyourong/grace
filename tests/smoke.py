@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+"""Check public availability, plus practice flows on the temporary CI and release Compose stacks.
+Run with python3 tests/smoke.py [BASE_URL]. Defaults to GRACE_URL or http://localhost:8090.
+"""
+
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+
+import hashlib
+import json
+import os
+import secrets
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+BASE_URL = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("GRACE_URL", "http://localhost:8090")).rstrip("/")
+
+
+class Client:
+    def __init__(self, base_url: str, session: str | None = None) -> None:
+        self.base_url = base_url
+        self.session = session
+
+    def request(self, method: str, path: str, body: object | None = None) -> tuple[int, dict | None]:
+        data = None
+        headers: dict[str, str] = {}
+        if self.session:
+            headers["Cookie"] = f"session={self.session}"
+        if method not in ("GET", "HEAD", "OPTIONS"):
+            headers["Origin"] = self.base_url
+        if body is not None:
+            headers["Content-Type"] = "application/json"
+            raw = body if isinstance(body, str) else json.dumps(body, ensure_ascii=False)
+            data = raw.encode("utf-8")
+
+        req = urllib.request.Request(f"{self.base_url}{path}", data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                raw_resp = resp.read()
+                return resp.status, _try_json(raw_resp)
+        except urllib.error.HTTPError as err:
+            raw_resp = err.read()
+            return err.code, _try_json(raw_resp)
+
+
+def _try_json(raw_resp: bytes) -> dict | None:
+    if not raw_resp:
+        return None
+    try:
+        return json.loads(raw_resp)
+    except json.JSONDecodeError:
+        return None
+
+
+def wait_ready(client: Client) -> None:
+    for _ in range(30):
+        try:
+            status, _ = client.request("GET", "/health/ready")
+            if status == 200:
+                return
+        except urllib.error.URLError:
+            pass
+        time.sleep(1)
+    raise RuntimeError(f"Service at {client.base_url} did not become ready in 30s")
+
+
+def run_sql(sql: str) -> None:
+    subprocess.run(
+        ["docker", "compose", "exec", "-T", "db", "psql", "-X", "-U", "grace", "-d", "grace", "-v", "ON_ERROR_STOP=1", "-q"],
+        input=sql, text=True, check=True, cwd=ROOT, timeout=60,
+    )
+
+
+def seed_sessions(username: str, count: int) -> list[str]:
+    """Creates a user and `count` open sessions for it directly in the database; returns the session tokens."""
+    tokens = [secrets.token_hex(32) for _ in range(count)]
+    hashes = ", ".join(f"('{hashlib.sha256(t.encode()).hexdigest()}')" for t in tokens)  # the app stores SHA-256 only
+    run_sql(
+        f"""WITH u AS (INSERT INTO users (username, password_hash) VALUES ('{username}', '') RETURNING id)
+            INSERT INTO sessions (token_hash, user_id, expires_at)
+            SELECT h, u.id, now() + interval '1 hour' FROM u, (VALUES {hashes}) AS t(h);"""
+    )
+    return tokens
+
+
+def check_practice_grading(client: Client, paper_id: str) -> None:
+    """Issue #18: exercise grading, resubmission, errors, and persistence."""
+    base = f"/api/papers/{paper_id}"
+
+    def submit(qid: str, body: dict) -> tuple[int, dict | None]:
+        return write(f"answers/{qid}", body)
+
+    def write(path: str, body: dict):
+        nonlocal revision
+        status, result = client.request("PUT", f"{base}/{path}", {**body, "expected_revision": revision})
+        if status == 200:
+            assert result["revision"] == revision + 1, result
+            revision = result["revision"]
+        return status, result
+
+    def expect_stats(stats: dict, answered: int, correct: int, incorrect: int) -> None:
+        assert stats == {
+            "total": 3,
+            "answered": answered,
+            "correct": correct,
+            "incorrect": incorrect,
+            "unanswered": 3 - answered,
+        }, stats
+
+    # This is a newly uploaded, previously unanswered French sample paper.
+    status, detail = client.request("GET", base)
+    assert status == 200, (status, detail)
+    revision = detail["revision"]
+    expect_stats(detail["stats"], 0, 0, 0)
+
+    # A listed but wrong choice is valid: it must be saved and counted as wrong.
+    status, res = submit("q1", {"option_id": "b"})
+    assert status == 200, (status, res)
+    assert res["answer"]["saved_answer"] == "b", res
+    assert res["answer"]["is_correct"] is False, res
+    assert res["answer"]["correct_answer"] == "Bonjour", res
+    assert res["answer"]["explanation"], res
+    expect_stats(res["stats"], 1, 0, 1)
+
+    # Correct the SAME question: it stays answered once, and stats change.
+    status, res = submit("q1", {"option_id": "a"})
+    assert status == 200 and res["answer"]["is_correct"] is True, (status, res)
+    expect_stats(res["stats"], 1, 1, 0)
+
+    # Set a different position, then ensure an invalid submission changes neither.
+    status, body = write("position", {"question_id": "q3"})
+    assert status == 200 and body["revision"] == revision, (status, body)
+    status, err = submit("q1", {"option_id": "z"})
+    assert status == 400 and err["error"] == {
+        "code": "invalid_answer", "message": "That option does not belong to this question"
+    }, (status, err)
+    status, err = submit("q1", {"text": "Bonjour"})
+    assert status == 400 and err["error"]["message"] == "Choice questions require option_id", (status, err)
+    status, err = submit("bad!", {"option_id": "a"})
+    assert status == 404 and err["error"]["code"] == "not_found", (status, err)
+    status, err = write("position", {"question_id": "bad!"})
+    assert status == 404 and err["error"]["code"] == "not_found", (status, err)
+    status, detail = client.request("GET", base)
+    assert status == 200 and detail["current_question_id"] == "q3", (status, detail)
+    q1 = next(q for q in detail["questions"] if q["id"] == "q1")
+    assert q1["answer"]["saved_answer"] == "a" and q1["answer"]["is_correct"] is True, q1
+    expect_stats(detail["stats"], 1, 1, 0)
+
+    # A wrong translation must still return its reference answer and feedback.
+    status, res = submit("q2", {"text": "Bonsoir"})
+    assert status == 200 and res["answer"]["is_correct"] is False, (status, res)
+    assert res["answer"]["correct_answer"] == "Merci.", res
+    assert res["answer"]["explanation"], res
+    expect_stats(res["stats"], 2, 1, 1)
+
+    # Normalized text matches, but the ORIGINAL submission is retained.
+    original = "  merci!! "
+    status, res = submit("q2", {"text": original})
+    assert status == 200 and res["answer"]["is_correct"] is True, (status, res)
+    assert res["answer"]["saved_answer"] == original, res
+    expect_stats(res["stats"], 2, 2, 0)
+
+    # Rejected text must not overwrite the previous valid answer or progress.
+    invalid_texts = [
+        ({}, "text is required"),
+        ({"text": "?! ..."}, "The answer must not be empty"),
+        ({"text": "x" * 2001}, "The answer must be at most 2000 characters and must not contain NUL characters"),
+        ({"text": "a\0b"}, "The answer must be at most 2000 characters and must not contain NUL characters"),
+    ]
+    for payload, message in invalid_texts:
+        status, err = submit("q2", payload)
+        assert status == 400 and err["error"] == {
+            "code": "invalid_answer", "message": message
+        }, (payload, status, err)
+    status, detail = client.request("GET", base)
+    q2 = next(q for q in detail["questions"] if q["id"] == "q2")
+    assert status == 200 and q2["answer"]["saved_answer"] == original, (status, detail)
+    assert q2["answer"]["is_correct"] is True, q2
+    assert detail["current_question_id"] == "q2", detail
+    expect_stats(detail["stats"], 2, 2, 0)
+
+    # Sentence questions use the same normalization-based text grading.
+    status, res = submit("q3", {"text": "J'aime le français."})
+    assert status == 200 and res["answer"]["is_correct"] is True, (status, res)
+    expect_stats(res["stats"], 3, 3, 0)
+
+    # Finishing reports final stats without locking or erasing the paper.
+    status, res = client.request("POST", f"{base}/finish")
+    assert status == 200, (status, res)
+    expect_stats(res["stats"], 3, 3, 0)
+    status, detail = client.request("GET", base)
+    assert status == 200, (status, detail)
+    expect_stats(detail["stats"], 3, 3, 0)
+    print("Practice grading smoke checks passed!")
+
+
+def main() -> None:
+    public = Client(BASE_URL)
+    wait_ready(public)
+    for path, expected in [("/", 200), ("/health/live", 200), ("/api/papers", 401), ("/api/auth/me", 401)]:
+        status, _ = public.request("GET", path)
+        assert status == expected, (path, status)
+    print("Public availability and anonymous access checks passed.")
+
+    target = urllib.parse.urlsplit(BASE_URL)
+    if target.scheme != "http" or target.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        return
+    if os.environ.get("COMPOSE_PROJECT_NAME") not in {"grace-ci", "grace-release"}:
+        return
+
+    suffix = secrets.token_hex(8)
+    name_a, name_b = f"smoke_a_{suffix}", f"smoke_b_{suffix}"
+    try:
+        tokens_a = seed_sessions(name_a, 2)
+        tokens_b = seed_sessions(name_b, 1)
+        run_checks(Client(BASE_URL, tokens_a[0]), Client(BASE_URL, tokens_b[0]), tokens_a[1])
+    finally:
+        run_sql(f"DELETE FROM users WHERE username IN ('{name_a}', '{name_b}');")
+
+
+def run_checks(user_a: Client, user_b: Client, resume_session: str) -> None:
+    # Two simultaneous first visits must receive the same six completed papers.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first, second = pool.map(lambda client: client.request("GET", "/api/papers"),
+                                 [user_a, Client(BASE_URL, resume_session)])
+    assert first == second and first[0] == 200, (first, second)
+    starters = first[1]["papers"]
+    assert [p["title"] for p in starters] == [
+        "French Basics", "Basic Sentences", "Questions", "Simple Subordinate Clauses",
+        "Relative Clauses", "Complex Sentences",
+    ]
+    assert [p["stats"]["total"] for p in starters] == [3, 10, 10, 10, 10, 10]
+    assert not first[1]["folders"] and all(p["folder_id"] is None for p in starters)
+
+    assert first[1]["study_seconds"] == 0
+    assert [p["current_question_number"] for p in starters] == [1] * 6
+    assert [p["title"] for p in starters if p["is_default"]] == ["French Basics"]
+    end = time.time_ns() // 1_000_000
+    span = {"start_ms": end - 20_000, "end_ms": end - 5_000}
+    route = "/api/practice/time"
+    assert Client(BASE_URL).request("POST", route, span)[0] == 401
+    other = {"start_ms": end - 10_000, "end_ms": end}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        assert all(r[0] == 204 for r in pool.map(lambda body: user_a.request("POST", route, body), [other, span, span]))
+    assert user_a.request("GET", "/api/papers")[1]["study_seconds"] == 20
+    assert user_b.request("GET", "/api/papers")[1]["study_seconds"] == 0
+    for bad in [dict(span, end_ms=end-100_000), dict(span, end_ms=end+60_000), dict(span, start_ms=end-90_000)]:
+        assert user_a.request("POST", route, bad)[0] == 400
+
+    # 1. Invalid upload returns 400 with at least three details.
+    invalid_paper = json.loads((ROOT / "examples" / "invalid-paper.json").read_text(encoding="utf-8"))
+    status, err = user_a.request("POST", "/api/papers", invalid_paper)
+    assert status == 400, f"expected 400 for invalid-paper.json, got {status}: {err}"
+    assert err["error"]["code"] == "invalid_paper_file", err
+    assert err["error"]["message"] == "The paper file is not valid", err
+    assert len(err["error"].get("details", [])) >= 3, f"expected >= 3 details, got {err}"
+
+    # 2. NUL input returns 400.
+    valid_paper = json.loads((ROOT / "examples" / "french-basics.json").read_text(encoding="utf-8"))
+    nul_paper = json.loads(json.dumps(valid_paper, ensure_ascii=False))
+    nul_paper["title"] = "法语\0基础"
+    status, err = user_a.request("POST", "/api/papers", nul_paper)
+    assert status == 400, f"expected 400 for NUL input, got {status}: {err}"
+    assert err["error"]["code"] == "invalid_paper_file", err
+
+    # 2b. Accepted answers that normalize to empty (e.g. "?!") return 400.
+    punct_paper = json.loads(json.dumps(valid_paper, ensure_ascii=False))
+    punct_paper["questions"][1]["accepted_answers"] = ["?!"]
+    status, err = user_a.request("POST", "/api/papers", punct_paper)
+    assert status == 400, f"expected 400 for punctuation-only accepted_answers, got {status}: {err}"
+    assert err["error"]["code"] == "invalid_paper_file", err
+    assert any("accepted_answers" in d for d in err["error"].get("details", [])), err
+
+    # 3. Uploading the same file twice produces distinct paper IDs.
+    status1, res1 = user_a.request("POST", "/api/papers", valid_paper)
+    status2, res2 = user_a.request("POST", "/api/papers", valid_paper)
+    assert status1 == 201 and status2 == 201, (status1, res1, status2, res2)
+    pid1 = res1["paper"]["id"]
+    pid2 = res2["paper"]["id"]
+    assert pid1 != pid2, f"expected distinct paper IDs, got {pid1} == {pid2}"
+
+    # 4. A forged owner_id is ignored: paper belongs to signed-in owner (A), not B or forged id.
+    forged_paper = dict(valid_paper, owner_id=999999)
+    status, res_forged = user_a.request("POST", "/api/papers", forged_paper)
+    assert status == 201, f"forged owner_id should be ignored, got {status}: {res_forged}"
+    forged_id = res_forged["paper"]["id"]
+    status, _ = user_a.request("GET", f"/api/papers/{forged_id}")
+    assert status == 200, f"owner A could not open paper {forged_id}: {status}"
+    status, _ = user_b.request("GET", f"/api/papers/{forged_id}")
+    assert status == 404, f"user B should get 404 for user A's paper, got {status}"
+
+    # 5. Question IDs/positions are preserved and unanswered questions reveal no answer key or feedback.
+    status, detail = user_a.request("GET", f"/api/papers/{pid1}")
+    assert status == 200, f"GET paper detail failed: {status} {detail}"
+    assert detail["current_question_id"] == "q1", detail
+    questions = detail["questions"]
+    assert [q["id"] for q in questions] == ["q1", "q2", "q3"], questions
+    assert [q["position"] for q in questions] == [1, 2, 3], questions
+    for q in questions:
+        assert q["answer"] is None, f"unanswered question should have null answer: {q}"
+        for forbidden in ("correct_option_id", "accepted_answers", "correct_answer", "explanation"):
+            assert forbidden not in q, f"unanswered question leaked {forbidden}: {q}"
+
+    fresh = Client(BASE_URL, resume_session)
+    base = f"/api/papers/{pid1}"
+    assert fresh.request("GET", base)[1]["revision"] == detail["revision"] == 0
+    for path, value in [("/position", {"question_id": "q2"}), ("/answers/q2", {"text": "Merci"})]:
+        assert fresh.request("PUT", base + path, value)[0] == 428
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        def navigate(client):
+            return client.request("PUT", base + "/position", {"question_id": "q2", "expected_revision": 0})
+        race = list(pool.map(navigate, (user_a, fresh)))
+    assert sorted(status for status, _ in race) == [200, 409], race
+    status, second = fresh.request("GET", base)
+    assert status == 200 and second["current_question_id"] == "q2" and second["revision"] == 1
+    assert second["stats"]["answered"] == 0 and second["questions"][1]["answer"] is None
+
+    # Answer q2 using its preserved author ID and verify only q2 gets feedback (without internal keys).
+    status, ans_res = user_a.request("PUT", f"/api/papers/{pid1}/answers/q2", {"text": "Merci", "expected_revision": second["revision"]})
+    assert status == 200, f"PUT answer by preserved ID q2 failed: {status} {ans_res}"
+    status, detail_after = user_a.request("GET", f"/api/papers/{pid1}")
+    assert status == 200, detail_after
+    q_by_id = {q["id"]: q for q in detail_after["questions"]}
+    assert q_by_id["q1"]["answer"] is None
+    assert q_by_id["q3"]["answer"] is None
+    assert q_by_id["q2"]["answer"]["saved_answer"] == "Merci"
+    assert q_by_id["q2"]["answer"]["correct_answer"] == "Merci."
+    assert q_by_id["q2"]["answer"]["explanation"]
+    for q in detail_after["questions"]:
+        assert "correct_option_id" not in q
+        assert "accepted_answers" not in q
+    check_practice_grading(user_a, pid2)
+    # Resume in a fresh browser session, at a question different from the one answered.
+    for path, value in [("/position", {"question_id": "q1"}), ("/answers/q2", {"text": "stale"})]:
+        status, err = fresh.request("PUT", base + path, {**value, "expected_revision": second["revision"]})
+        assert status == 409 and err["error"]["code"] == "progress_conflict", err
+    assert fresh.request("GET", base)[1] == detail_after
+    assert user_b.request("PUT", base + "/position", {"question_id": "q3", "expected_revision": 2})[0] == 404
+    status, moved = fresh.request("PUT", base + "/position", {"question_id": "q3", "expected_revision": detail_after["revision"]})
+    assert status == 200 and moved["revision"] == 3, moved
+    status, restored = fresh.request("GET", f"/api/papers/{pid1}")
+    assert status == 200, status
+    assert restored["current_question_id"] == "q3", restored
+    assert restored["stats"] == detail_after["stats"], restored
+    assert restored["questions"] == detail_after["questions"], restored
+    # Moves and deletion stay inside the account and preserve the practice record.
+    status, folder = user_a.request("POST", "/api/folders", {"name": "Grammar"})
+    assert status == 201
+    fid = folder["id"]
+    folder_url = "/api/folders/" + fid
+    assert user_b.request("GET", "/api/papers")[1]["folders"] == []
+    foreign_paper = user_b.request("GET", "/api/papers")[1]["papers"][0]["id"]
+    assert user_b.request("PATCH", "/api/papers/" + foreign_paper, {"folder_id": fid})[0] == 404
+    assert user_b.request("PATCH", base, {"folder_id": None})[0] == 404
+    assert user_b.request("DELETE", base)[0] == 404
+    assert user_b.request("PATCH", folder_url, {"name": "Other"})[0] == 404
+    assert user_b.request("DELETE", folder_url)[0] == 404
+    assert user_a.request("PATCH", folder_url, {"name": "Review"})[0] == 204
+    assert user_a.request("PATCH", base, {"folder_id": fid})[0] == 204
+    assert fresh.request("GET", base)[1] == restored
+    assert user_a.request("DELETE", folder_url)[0] == 204
+    library = fresh.request("GET", "/api/papers")[1]
+    assert next(p for p in library["papers"] if p["id"] == pid1)["current_question_number"] == 3
+    assert not library["folders"] and next(p for p in library["papers"] if p["id"] == pid1)["folder_id"] is None
+    assert fresh.request("GET", base)[1] == restored
+    assert user_a.request("DELETE", base)[0] == 204
+    assert fresh.request("GET", base)[0] == 404
+    for starter in starters:
+        assert user_a.request("DELETE", "/api/papers/" + starter["id"])[0] == 204
+    library = fresh.request("GET", "/api/papers")[1]
+    assert library["study_seconds"] == 20
+    assert {p["id"] for p in library["papers"]} == {pid2, forged_id}
+    assert len(user_b.request("GET", "/api/papers")[1]["papers"]) == 6
+    print("All papers, grading, and session-resume checks passed!")
+
+
+if __name__ == "__main__":
+    main()

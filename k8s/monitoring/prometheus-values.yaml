@@ -1,0 +1,19 @@
+alertmanager: { enabled: false }
+prometheus-pushgateway: { enabled: false }
+server:
+  retention: 6h
+  persistentVolume: { enabled: false }
+  global: { scrape_interval: 15s, evaluation_interval: 15s, scrape_timeout: 10s }
+  resources:
+    requests: { cpu: 80m, memory: 160Mi }
+    limits: { memory: 512Mi }
+# Preserve the actual Node name for the worker selector.
+extraScrapeConfigs: |
+  - job_name: grace-nodes
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces: { names: [grace] }
+    relabel_configs:
+      - { source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name], regex: prometheus-node-exporter, action: keep }
+      - { source_labels: [__meta_kubernetes_pod_container_port_number], regex: '9100', action: keep }
+      - { source_labels: [__meta_kubernetes_pod_node_name], target_label: node }

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Grace · Operations</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="brand">
+        <svg width="23" height="24" viewBox="0 0 24 24" aria-hidden="true">
+          <g
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linejoin="round"
+          >
+            <path d="m12 2 9 5-9 5-9-5z" />
+            <path d="m3 12 9 5 9-5M3 17l9 5 9-5" />
+          </g></svg
+        ><strong>Grace</strong><span class="slash">/</span> Operations
+      </div>
+      <nav aria-label="Dashboard views">
+        <a href="#topology-view">Topology</a><a href="#metrics-view">Metrics</a
+        ><a href="#health-view">Readiness</a>
+      </nav>
+      <span id="sync" role="status">Connecting…</span>
+    </header>
+    <main class="workspace">
+      <aside class="sidebar" aria-label="Cluster nodes">
+        <div class="panehead">
+          <h2>Explorer</h2>
+          <span id="nodeCount"></span>
+        </div>
+        <div class="tree">
+          <button id="overview" type="button" class="overview">
+            <span aria-hidden="true">▦</span> Cluster overview
+          </button>
+          <h3 class="eyebrow">Worker nodes</h3>
+          <div id="nodeList"></div>
+        </div>
+      </aside>
+      <div class="center">
+        <section id="topology-view" class="view">
+          <div class="panehead">
+            <h1>Cluster topology</h1>
+            <span id="updated"></span>
+          </div>
+          <div class="load-test" id="loadTest" hidden>
+            <div>
+              <strong>HPA load test</strong>
+              <p id="loadStatus" role="status"></p>
+              <p id="loadTimings"></p>
+            </div>
+            <button type="button" id="loadButton" disabled>
+              Start load test
+            </button>
+          </div>
+          <div class="maparea">
+            <div class="scroll">
+              <svg
+                id="topology"
+                aria-label="Worker nodes, pods, service endpoints and mounted volumes"
+              ></svg>
+            </div>
+          </div>
+          <div class="key">
+            <span><i class="edge"></i>Ready endpoint</span
+            ><span><i class="edge mount"></i>Mounted volume</span
+            ><span><i class="dot"></i>Login request</span>
+          </div>
+          <div class="resourcehead">
+            <h2>Node resources</h2>
+            <a href="#metrics-view">View metrics ↗</a>
+          </div>
+          <div id="quickMetrics"></div>
+        </section>
+        <section id="metrics-view" class="view" hidden>
+          <div class="panehead">
+            <h1>Metric trends</h1>
+            <label
+              >Worker
+              <select id="worker">
+                <option value="">All nodes</option>
+              </select></label
+            >
+          </div>
+          <div class="metricrange">
+            <span id="range">Last 15 minutes</span
+            ><span>15 s samples · dashed line marks login burst</span>
+          </div>
+          <div id="charts"></div>
+        </section>
+        <section id="health-view" class="view" hidden>
+          <div class="panehead">
+            <h1>External readiness</h1>
+            <a
+              id="uptime"
+              href="https://cloud.digitalocean.com/insights/uptime/checks"
+              target="_blank"
+              rel="noreferrer"
+              >DigitalOcean Uptime ↗</a
+            >
+          </div>
+          <div class="health">
+            <h3 class="eyebrow">Presenter probe</h3>
+            <p id="health">Waiting for the presenter’s probe.</p>
+            <code>/health/ready</code
+            ><svg
+              id="probeplot"
+              role="img"
+              aria-label="External readiness and response times"
+            ></svg>
+          </div>
+          <section id="persistence" class="health" hidden>
+            <h2>Database persistence</h2>
+            <label>Environment <select id="commandEnv">
+              <option value="Compose">Docker Compose</option><option>Minikube</option><option>DOKS</option>
+            </select></label>
+            <p id="commandHelp"></p>
+            <ol id="persistenceSteps"></ol>
+            <p>After the restart, run the query in step 1 again or reopen the question in Grace to see the saved answer.</p>
+          </section>
+        </section>
+      </div>
+      <aside class="inspector" aria-label="Live activity and login details">
+        <div class="panehead"><h2>Live traffic</h2><span>Grace app Pods</span></div>
+        <section class="inspect-body traffic" aria-label="Network throughput">
+          <div class="flow-grid">
+            <div><span class="flow-in">↓ Inbound</span><strong id="flowIn">—</strong></div>
+            <div><span class="flow-out">↑ Outbound</span><strong id="flowOut">—</strong></div>
+          </div>
+          <svg id="flowPlot" role="img" aria-label="Inbound and outbound bandwidth over the last five minutes"></svg>
+          <p id="flowTime">Waiting for network samples.</p>
+        </section>
+        <div class="panehead cpu-panel"><h2>Application CPU</h2><span>HPA · app</span></div>
+        <section class="inspect-body cpu-panel" aria-label="Application CPU and autoscaling">
+          <div class="cpu-reading"><strong id="appCpu">—</strong><span id="cpuTarget">Target —</span></div>
+          <svg id="appCpuPlot" role="img" aria-label="Average app CPU as a percentage of requested CPU, with HPA target"></svg>
+          <p id="cpuCaption">Waiting for HPA metrics.</p>
+          <div id="cpuNotice" role="status" aria-live="polite" aria-atomic="true" hidden>
+            <strong id="cpuNoticeTitle"></strong><p id="cpuNoticeDetail"></p>
+          </div>
+        </section>
+        <div class="panehead"><h2>Pod activity</h2><span>Latest 100</span></div>
+        <div class="inspect-body activity">
+          <p id="podEmpty">Waiting for Pod changes.</p>
+          <ol id="podEvents" aria-label="Recent Pod notifications, newest first"></ol>
+          <span class="sr-only" id="podAnnounce" role="status"></span>
+        </div>
+        <div class="panehead">
+          <h2>Login burst</h2>
+          <span id="runTime"></span>
+        </div>
+        <div class="inspect-body">
+          <h3 class="eyebrow">Result</h3>
+          <div id="totals">Waiting for a login burst.</div>
+          <h3 class="eyebrow">Request timeline</h3>
+          <div id="timeline"></div>
+          <p id="runNote"></p>
+          <h3 class="eyebrow">Pod distribution</h3>
+          <ul id="distribution"></ul>
+        </div>
+      </aside>
+    </main>
+    <footer>
+      <span class="namespace"><i></i> Namespace <b>grace</b></span
+      ><span id="summary"></span>
+    </footer>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,267 @@
+{
+  "format_version": 1,
+  "title": "Complex Sentences",
+  "description": "Combine clauses to express conditions, concessions, causes and sequences.",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "choice",
+      "prompt": "Complete the unreal present condition: « Si j’avais une voiture, je ___ te chercher. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "venais de"
+        },
+        {
+          "id": "b",
+          "text": "viens"
+        },
+        {
+          "id": "c",
+          "text": "viendrai"
+        },
+        {
+          "id": "d",
+          "text": "viendrais"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "viendrais",
+      "explanation": "Si plus the imperfect pairs with the present conditional for this hypothetical result."
+    },
+    {
+      "id": "q2",
+      "type": "choice",
+      "prompt": "Complete the unreal past result: « Si elle avait vu le feu rouge, elle ___ à temps. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "s’arrête"
+        },
+        {
+          "id": "b",
+          "text": "se serait arrêtée"
+        },
+        {
+          "id": "c",
+          "text": "s’arrêtera"
+        },
+        {
+          "id": "d",
+          "text": "s’arrêterait demain"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "se serait arrêtée",
+      "explanation": "A past unreal condition uses the past conditional for its past result. With elle, arrêtée agrees."
+    },
+    {
+      "id": "q3",
+      "type": "choice",
+      "prompt": "Express concession using bien que: « Bien que la route ___ longue, nous continuons. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "sera"
+        },
+        {
+          "id": "b",
+          "text": "soit"
+        },
+        {
+          "id": "c",
+          "text": "serait"
+        },
+        {
+          "id": "d",
+          "text": "est"
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "soit",
+      "explanation": "Bien que takes the subjunctive, here soit."
+    },
+    {
+      "id": "q4",
+      "type": "choice",
+      "prompt": "Express purpose: « Je répète la consigne pour que chacun la ___. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "comprenne"
+        },
+        {
+          "id": "b",
+          "text": "comprendra"
+        },
+        {
+          "id": "c",
+          "text": "comprenait"
+        },
+        {
+          "id": "d",
+          "text": "comprend"
+        }
+      ],
+      "correct_option_id": "a",
+      "correct_answer": "comprenne",
+      "explanation": "Pour que introduces a purpose and takes the subjunctive of comprendre."
+    },
+    {
+      "id": "q5",
+      "type": "choice",
+      "prompt": "Show that the meal will already be over: « Quand nous ___ de dîner, nous sortirons. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "finissions"
+        },
+        {
+          "id": "b",
+          "text": "aurions fini"
+        },
+        {
+          "id": "c",
+          "text": "avions fini"
+        },
+        {
+          "id": "d",
+          "text": "aurons fini"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "aurons fini",
+      "explanation": "The future perfect aurons fini marks completion before the later future action."
+    },
+    {
+      "id": "q6",
+      "type": "choice",
+      "prompt": "Choose a cause followed by its consequence: “Since the bridge is closed, we will take a detour.”",
+      "options": [
+        {
+          "id": "a",
+          "text": "Même si le pont est ouvert, nous ferons un détour."
+        },
+        {
+          "id": "b",
+          "text": "Puisque le pont est fermé, nous ferons un détour."
+        },
+        {
+          "id": "c",
+          "text": "Nous ferons un détour avant que le pont ferme."
+        },
+        {
+          "id": "d",
+          "text": "Nous fermerons le pont pour éviter un détour."
+        }
+      ],
+      "correct_option_id": "b",
+      "correct_answer": "Puisque le pont est fermé, nous ferons un détour.",
+      "explanation": "Puisque presents the closure as an established reason for the detour."
+    },
+    {
+      "id": "q7",
+      "type": "choice",
+      "prompt": "Complete both links: « Le guide ___ nous a aidés sait ___ le sentier est fermé. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "dont / lequel"
+        },
+        {
+          "id": "b",
+          "text": "où / laquelle"
+        },
+        {
+          "id": "c",
+          "text": "que / pourquoi"
+        },
+        {
+          "id": "d",
+          "text": "qui / pourquoi"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "qui / pourquoi",
+      "explanation": "Qui is the subject of a aidés. Pourquoi introduces the indirect question about the closure."
+    },
+    {
+      "id": "q8",
+      "type": "choice",
+      "prompt": "Choose a contrast that keeps both facts true: it is raining and the match continues.",
+      "options": [
+        {
+          "id": "a",
+          "text": "Le match a cessé dès qu’il a plu."
+        },
+        {
+          "id": "b",
+          "text": "S’il pleut, le match sera annulé."
+        },
+        {
+          "id": "c",
+          "text": "Il pleut, mais le match continue."
+        },
+        {
+          "id": "d",
+          "text": "Le match continue parce que le soleil brille."
+        }
+      ],
+      "correct_option_id": "c",
+      "correct_answer": "Il pleut, mais le match continue.",
+      "explanation": "Mais connects two facts whose combination is unexpected."
+    },
+    {
+      "id": "q9",
+      "type": "choice",
+      "prompt": "Complete the sequence: « Avant que le train ___, vérifie que tu as ton billet. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "partira"
+        },
+        {
+          "id": "b",
+          "text": "part"
+        },
+        {
+          "id": "c",
+          "text": "partait"
+        },
+        {
+          "id": "d",
+          "text": "parte"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "parte",
+      "explanation": "Avant que takes the subjunctive, so partir becomes parte."
+    },
+    {
+      "id": "q10",
+      "type": "choice",
+      "prompt": "Report a future event from a past viewpoint: « Hier, elle a annoncé qu’elle ___ le lendemain. »",
+      "options": [
+        {
+          "id": "a",
+          "text": "partir"
+        },
+        {
+          "id": "b",
+          "text": "part maintenant"
+        },
+        {
+          "id": "c",
+          "text": "était partie la veille"
+        },
+        {
+          "id": "d",
+          "text": "partirait"
+        }
+      ],
+      "correct_option_id": "d",
+      "correct_answer": "partirait",
+      "explanation": "The conditional partirait expresses a departure that was future at the time of the announcement."
+    }
+  ]
+}
