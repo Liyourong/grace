@@ -1,126 +1,172 @@
-# Grace
+# Grace: Final Report
 
-## Commit Message Rules
+## Team Information
 
-### Recommended Format
+## Motivation
 
-In this course project, we recommend a lightweight [**Conventional Commits–style**](https://www.conventionalcommits.org/) format:
+## Objectives
 
-```text
-<type>(optional scope)[!]: <short imperative summary>
+## Technical Stack
+
+## Features
+
+## User Guide
+
+Grace helps you practice French with papers of multiple-choice, translation and sentence questions. Your answers and position are saved to your account.
+
+### 1. Register and verify your email
+
+1. Open Grace and choose **Sign up**.
+2. Enter a username (3 to 32 letters, digits or underscores), your email and a password (8 to 128 characters), then choose **Send verification code**.
+
+![Registration form](docs/images/02-register.png)
+
+3. Enter the six-digit code from the email and choose **Verify and create account**. Each code allows five attempts. **Resend code** unlocks after 60 seconds and sends the same code again.
+
+![Code entry](docs/images/03-verify-code.png)
+
+If no email arrives, check your spam folder, wait a minute and choose **Resend code**. After five wrong codes, choose **Use a different email** and start again.
+
+Your account starts with six starter papers. Sign in with your username and password. Usernames are not case-sensitive, so Alice and alice are the same account. Sessions last seven days, then Grace asks you to sign in again. Use the sign-out icon at the bottom of the sidebar to leave, and the monitor icon beside it to switch themes.
+
+![Overview after registration](docs/images/04-overview.png)
+
+### 2. Open or add a paper
+
+- To open a paper, pick it under **My papers**, or choose **Start practicing** or **Continue** on the Overview.
+- To add one, choose **Upload a paper**, pick or drop a `.json` file (1 MiB maximum), choose **Upload**, then **Start practicing**. The page shows the required format: JSON with `format_version` 1, a `title` and a list of `questions`, each with an `id`, `type`, `prompt` and answers. `examples/french-basics.json` makes a good template. Each upload creates a new paper.
+- To organize papers, use **New folder** and the **⋯** menu beside a paper.
+
+![Paper saved after upload](docs/images/06-uploaded.png)
+
+### 3. Generate a paper with AI
+
+Choose **Generate a paper** and describe the topic and level, such as "A2 French questions about travel". Pick 1 to 10 questions and optionally select question types; leave all types unchecked to let AI choose. Then choose **Generate with AI**, wait up to a minute, and open the result with **Open paper**. Generated papers appear under **My papers**.
+
+![Generate form](docs/images/07-generate.png)
+
+If generation is unavailable or busy, try again later or ask your DevOps contact.
+
+### 4. Submit an answer
+
+For multiple choice, click an option. For translation and sentence questions, type in **Your answer** and press Enter (Shift+Enter adds a line) or click the arrow button. Answers can be up to 2,000 characters. Translation and sentence answers are checked against the paper's accepted answers, so valid alternatives count. Grace immediately shows Correct or Incorrect, the reference answer and a short explanation.
+
+![Graded answer with Explain button](docs/images/10-feedback.png)
+
+You can edit and resubmit an answer; Grace warns about unsubmitted changes. Move with **Previous**, **Next** or the question numbers. **Finish** shows a summary, and you can review your answers afterwards.
+
+### 5. Request an explanation
+
+After an answer is graded, choose **Explain** for a short AI explanation. It appears under **Additional explanation** and never changes your grade. If you edited the answer, submit it first. If you see "Explanation is temporarily unavailable," choose **Retry Explain** later.
+
+### 6. Resume on another device
+
+Sign in with the same username and password. The Overview shows **Continue practice** with your latest paper, question number and answered count. Choose **Continue** to return to that question. The Overview also totals your study time, which counts only active practice, and answered questions.
+
+![Overview on a second browser](docs/images/13-resume-overview.png)
+
+Grace saves your position as you move between questions. If another device changed your progress, Grace asks you to review the latest position and try again.
+
+### Features that require DevOps access
+
+Only operator accounts see the **DevOps** sidebar link, which opens `/devops/` with cluster topology, metrics, readiness, logs and load tests. DevOps must also configure SendGrid for verification emails and an AI function for generation and explanations. Without them, those features report as unavailable.
+
+## Development Guide
+
+### Prerequisites
+
+- Git, and Python 3 for the smoke test
+- Docker with Compose v2 (easiest), or Rust 1.85+, Node.js 22+ and PostgreSQL 16+
+
+### Repository layout
+
+- `backend/`: Rust (Axum) API with `auth`, `papers` and `practice` modules, plus SQL migrations
+- `frontend/`: React and Vite single-page app
+- `functions/`: the AI function; `k8s/`: Kubernetes manifests; `tests/`: smoke and function tests
+
+### Quick start (Docker Compose)
+
+```sh
+git clone https://github.com/Liyourong/grace.git && cd grace
+docker compose up --build -d --wait
 ```
 
-### Guidelines
+Open <http://localhost:8090> (host port 8090 maps to the container's 8080; edit `compose.yaml` if it is taken). The first build takes several minutes. After changing code, rerun the same command to rebuild.
 
-- Use **imperative mood** (e.g., “add”, “fix”, “remove”).
-- Keep the entire subject line **≤ 50 characters**, including the type and scope.
-- `scope` and `!` are optional — use them when helpful. Use `!` to indicate a breaking change.
+### Without Docker
 
-In real projects, always follow the commit message convention used by your team or organization — even if it differs from this one.
-
-### Common Types
-
-- `feat`: new functionality
-- `fix`: bug fixes
-- `docs`: documentation changes
-- `refactor`: code changes without behavior change
-- `chore`: cleanup, configuration, maintenance
-- `ci`: GitHub Actions / automation
-
-### Examples
-
-```text
-feat: add WebSocket updates for task status
-feat(storage): mount a postgres volume
-fix(compose)!: rename db service to postgres
-docs: add local dev setup instructions
-refactor(api): simplify request validation
+```sh
+psql -U postgres -c "CREATE USER grace PASSWORD 'grace_local_only'" \
+                 -c "CREATE DATABASE grace OWNER grace"
+(cd frontend && npm ci && npm run build)
+cd backend
+DATABASE_URL=postgres://grace:grace_local_only@localhost:5432/grace \
+STATIC_DIR=../frontend/dist APP_ORIGINS=http://localhost:8080 cargo run
 ```
 
-## Email verification
+Open <http://localhost:8080> in your browser. Grace serves the built frontend from disk, so after editing `frontend/` run `npm run build` and refresh; the backend needs no restart. The Vite dev server has no API proxy, so use the built app.
 
-New users register in two steps: `POST /api/auth/register` (username, password, email) emails a six-digit
-code, and `POST /api/auth/verify` (email, code) creates the account and its first session. Nothing exists in
-`users` or `sessions` until the code is accepted. Existing accounts keep signing in with username and password.
-Each registration allows 5 wrong codes and one email per address per 60 seconds, with at most 5 emails;
-a resend repeats the same code, so earlier emails stay valid.
-
-The backend reads these environment variables. In Kubernetes they come from the Secret `grace-sendgrid`
-on DOKS. The app requires the API key and sender at startup. Demo settings are optional.
+### Environment variables
 
 | Variable | Purpose |
 | --- | --- |
-| `SENDGRID_API_KEY` | SendGrid API key |
-| `SENDGRID_FROM_EMAIL` | Sender address verified in SendGrid |
-| `DEMO_EMAIL`, `DEMO_CODE` | Optional. Together they let that one address register with the fixed code, once |
+| `DATABASE_URL` | Required PostgreSQL connection string |
+| `APP_ORIGINS` | Browser origins allowed to make changes; must match the address you open |
+| `STATIC_DIR`, `PORT` | Built frontend folder (default `../frontend`) and port (default 8080) |
+| `COOKIE_SECURE` | Set `true` only behind HTTPS |
+| `POSTGRES_PASSWORD` | Compose only; default `grace_local_only` |
+| `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL` | Verification emails |
+| `DEMO_EMAIL`, `DEMO_CODE` | One address may register once with this fixed code |
+| `GRACE_EXPLAIN_URL`, `GRACE_EXPLAIN_TOKEN` | AI generation and explanations |
+| `GRACE_TEST_PASSWORD_HASH` | Argon2 hash that creates operator account `grace_test` |
 
-Create the Secret in the cluster before merging to `dev` (the key file stays on your machine):
+Compose reads these from your shell or an untracked `.env`. Never commit secrets.
+
+### PostgreSQL and persistent storage
+
+When it starts, Grace applies the SQL files in `backend/migrations` and creates its authentication tables, so an empty database needs no manual setup. Compose keeps data in the named volume `pgdata`: `docker compose down` preserves it, while `docker compose down -v` deletes it. Without Docker, data lives in your PostgreSQL data directory. Inspect it with `docker compose exec db psql -U grace -d grace`.
+
+### External credentials
+
+| Feature | Needs |
+| --- | --- |
+| Verification emails | SendGrid API key and verified sender; otherwise registration returns 503 |
+| AI generation and explanations | HTTPS URL and token of the function in `functions/`, which holds an `OPENAI_API_KEY`; otherwise both report "unavailable" |
+
+For local registration without email, set `DEMO_EMAIL` and `DEMO_CODE`, then register that address with the code. Sign-in, uploads, starter papers, grading and resuming need no credentials.
+
+### Local tests
 
 ```sh
-kubectl -n grace create secret generic grace-sendgrid \
-  --from-file=SENDGRID_API_KEY=sendgrid-api-key.txt \
-  --from-literal=SENDGRID_FROM_EMAIL='verified-sender@example.com'
-kubectl -n grace rollout restart deployment/app   # env from a Secret is read at start-up
+cd backend && cargo test --locked                  # Rust unit tests
+cd frontend && npm ci && npm run lint && npm run build
+node --test tests/generate-paper.cjs               # AI function contract
+python3 tests/smoke.py http://localhost:8090       # Grace must be running
 ```
 
-After deploying, register a real address on the live site and confirm the email arrives. Locally, put the same
-variables in an untracked `.env` next to `compose.yaml`.
+CI (`.github/workflows/grace.yml`) runs the same checks on every pull request to `dev`.
 
-The smoke tests check the homepage, health endpoints and anonymous access. For an HTTP loopback
-target in the temporary `grace-ci` and `grace-release` Compose projects, they also create short-lived test
-sessions and exercise uploads, grading, isolation and progress recovery. Public checks use anonymous HTTP.
+The smoke test checks the homepage, health endpoints and anonymous access (HTTP 401). Its signed-in checks run only in CI's temporary `grace-ci` and `grace-release` Compose projects.
 
+### Confirm Grace started
 
-## CI and deployment
+1. `docker compose ps` shows `db` healthy and `app` running.
+2. `docker compose logs app` ends with `grace listening on 0.0.0.0:8080`. On a first start it also lists `applied migration 0001_init` through `0007_devops`.
+3. `curl -i localhost:8090/health/ready` returns `200`. `curl -i localhost:8090/api/auth/me` returns `401` while signed out.
+4. The browser shows the **Welcome back** sign-in page.
 
-A PR to `dev` runs the `verify` check on an isolated Linux runner. It runs Rust tests,
-frontend checks, an offline render of the DOKS configuration, and the HTTP smoke tests
-against the production image and a temporary PostgreSQL 17 database. For the static frontend,
-CI checks JavaScript syntax. For the npm frontend, CI runs lint and the Docker build
-type-checks the application. The check compares the served homepage, JavaScript and
-CSS with the files from the image. It does not exercise browser interactions.
+Without Docker, use port 8080 and read the log in your terminal. Stop Grace with `docker compose down` (add `-v` only to delete data) or Ctrl+C.
 
-### Enable automatic releases
+If signing in or registering fails with "Request origin not allowed" (HTTP 403), `APP_ORIGINS` does not match the address in your browser.
 
-In GitHub Settings → Environments → `ci-cd-pipeline`, allow the **branch**
-`dev` to deploy. The existing `DIGITALOCEAN_ACCESS_TOKEN` secret is used by
-the deploy job. Its DigitalOcean scopes are `registry:read`, `registry:update`,
-`kubernetes:read` and `kubernetes:access_cluster`. Pull requests run CI only.
-To require a green PR before merging, make `verify` a required check on `dev`.
+## Deployment Information
 
-Merge the pipeline PR first. Its V6 release promotes the published V4 image
-by digest and tests it against a fresh PostgreSQL 17 database. Wait for V6
-to pass the public checks, then merge the application PR. V7 builds and ships
-the application from that merged commit. Use squash or merge commits for the
-two PRs, with no intervening pushes to `dev`.
+The live application is at <https://146-190-191-107.sslip.io>.
 
-### Routine releases
+Open it in a signed-out browser. The Grace "Welcome back" sign-in page should load. Grace runs on DigitalOcean Kubernetes and is redeployed on each push to `dev`.
 
-Each push to `dev` verifies the merged commit. Release numbers start at V6,
-counting first-parent commits after `bcffa6b`. A skipped commit can leave
-a gap in the numbers. The commit SHA and the version label identify the
-image in the Grace registry. Retries reuse a previously published SHA.
-The workflow deploys by digest and records the old and new images in Actions.
+## AI Assistance & Verification (Summary)
 
-The job checks the exact registry image in Compose, dry-runs the Kubernetes
-manifest and checks the current head of `dev` before applying it. It verifies
-the rollouts, database PVC, public health, frontend files and anonymous access.
-Grading and progress recovery run against the temporary Compose database.
-Inspect the Actions summary for the release number and result.
+## Individual Contributions
 
-If acceptance fails after switching the app, the job restores its previous
-image and checks the public homepage and readiness. This rollback covers
-the application image. For a release that changes database schema or other
-Kubernetes resources, plan their recovery separately. Retry failed jobs
-to reuse the one-day CI artifact, or rerun all jobs if it has expired.
-
-## Database backups
-
-DOKS runs a daily `CronJob` (`postgres-backup` at 05:00 AM `America/Toronto`) that
-exports PostgreSQL with `pg_dump -Fc` and uploads private archives to DigitalOcean
-Spaces with 7-day retention. See [the DOKS backup and restore runbook](k8s/doks/README.md)
-for manual trigger, verification, and `pg_restore` recovery commands.
-
-## Operations dashboard
-
-Open the live cluster map, visualize concurrent logins and rehearse HPA scaling with the [dashboard runbook](dashboard/README.md).
+## Lessons Learned and Concluding Remarks
